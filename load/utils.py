@@ -5,18 +5,20 @@ Pre-processing utils
 import networkx as nx
 import pandas as pd
 
+from constants import DATA_DIR
+
 
 def load_network(year: int, weighted=False) -> nx.Graph:
     """Load subreddits network of given year
 
     Args:
-        year (int): Year
+        year (int): year
         weighted (str): weighted vs unweighted
 
     Returns:
         nx.Graph: networkx graph
     """
-    network_file = f"/workspaces/polarization_reddit/data/networks/networks_{year}.csv"
+    network_file = f"{DATA_DIR}/networks/networks_{year}.csv"
 
     # Load network
     network = pd.read_csv(network_file)
@@ -49,7 +51,7 @@ def load_comments(
     Returns:
         pd.DataFrame: comments pandas dataframe
     """
-    comments_folder = f"/workspaces/polarization_reddit/data/comments/comments_{year}"
+    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
     comments = []
     # Load comments in chunks
     for month in range(start_month, stop_month + 1):
@@ -63,6 +65,7 @@ def load_comments(
         ):
             comments_chunk_df = comments_chunk_df[
                 (comments_chunk_df.body != "[deleted]")
+                & (comments_chunk_df.author != "[deleted]")
             ]
             comments.append(comments_chunk_df)
 
@@ -79,7 +82,7 @@ def load_users() -> pd.DataFrame:
     """
     users = []
     for users_chunk_df in pd.read_json(
-        "/workspaces/polarization_reddit/data/metadata/users_metadata.json",
+        f"{DATA_DIR}/metadata/users_metadata.json",
         orient="records",
         lines=True,
         chunksize=1e4,
@@ -94,6 +97,24 @@ def load_users() -> pd.DataFrame:
     return df_users
 
 
+def load_subreddits() -> pd.DataFrame:
+    """Load all users
+
+    Returns:
+        pd.DataFrame: user dataframe
+    """
+    subreddits_df = pd.read_json(
+        f"{DATA_DIR}/metadata/subreddits_metadata.json",
+        orient="records",
+        lines=True,
+    )
+
+    # Filter out regional and international subreddits
+    subreddits_df = subreddits_df[(subreddits_df["region"] == "")]
+
+    return subreddits_df
+
+
 def save_df_as_json(data: pd.DataFrame, target_file: str):
-    folder = "/workspaces/polarization_reddit/data/output"
+    folder = f"{DATA_DIR}/output"
     data.to_json(f"{folder}/{target_file}", orient="records", lines=True)

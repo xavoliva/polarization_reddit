@@ -1,6 +1,9 @@
 """
 Load data constants
 """
+
+DATA_DIR = "/workspaces/polarization_reddit/data"
+
 ALL_COMMENT_COLUMNS = [
     "author",
     "body",

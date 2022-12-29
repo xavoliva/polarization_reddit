@@ -4,7 +4,6 @@ Pre-processing constants
 import pandas as pd
 
 DATA_DIR = "data"
-INPUT_DIR = f"{DATA_DIR}/input"
 EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
 FIGURES_DIR = f"{DATA_DIR}/figures"
@@ -27,6 +26,8 @@ EVENTS_INFO = {
         "date": pd.to_datetime("11-06-2018"),
     },
 }
+
+ELECTIONS_REGEX = "vote|us|election|trump|hillary|president|candidate|democrat|republican|donald|clinton|reps|dems|elect|ballot|crooked|swing"
 
 EVENTS = EVENTS_INFO.keys()
 
