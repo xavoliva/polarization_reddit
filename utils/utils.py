@@ -13,17 +13,12 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 from constants import COLUMNS, EVENTS_DIR, INPUT_DIR
 
-sno = nltk.stem.LancasterStemmer()  # ("english")
-
 
 def txt_to_list(data_path):
-    with open(data_path, "r") as f:
-        data = f.read().splitlines()
+    with open(data_path, "r", encoding="utf-8") as file:
+        data = file.read().splitlines()
 
         return data
-
-
-STOPWORDS = txt_to_list(f"{INPUT_DIR}/stopwords.txt")
 
 
 def get_files_from_folder(folder_name, compression="bz2"):
@@ -78,8 +73,11 @@ def load_data(data_path, year, months=None, tokenize=False, comp="bz2", dev=Fals
         print(f"Tokenizing body... (nr_rows = {len(data)})")
 
         tic = time.perf_counter()
+
+        stopwords = txt_to_list(f"{INPUT_DIR}/stopwords.txt")
+
         data["tokens"] = data["body"].apply(
-            lambda x: tokenize_post(x, STOPWORDS, stemmer=True)
+            lambda x: tokenize_post(x, stopwords, stemmer=True)
         )
         toc = time.perf_counter()
 
@@ -113,9 +111,12 @@ def tokenize_post(text, keep_stopwords=False, stemmer=True):
 
     if not keep_stopwords:
         # filter stopwords
-        tokens = [t for t in tokens if t not in STOPWORDS]
+        stopwords = txt_to_list(f"{INPUT_DIR}/stopwords.txt")
+
+        tokens = [t for t in tokens if t not in stopwords]
     # stem words
     if stemmer:
+        sno = nltk.stem.LancasterStemmer()  # ("english")
         tokens = [sno.stem(t) for t in tokens]
 
     return tokens
