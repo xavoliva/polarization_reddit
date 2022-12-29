@@ -1,62 +1,33 @@
 """
 Pre-processing constants
 """
-ALL_COMMENT_COLUMNS = [
-    "author",
-    "body",
-    "body_cleaned",
-    "controversiality",
-    "created_utc",
-    "distinguished",
-    "edited",
-    "gilded",
-    "id",
-    "language",
-    "link_id",
-    "parent_id",
-    "retrieved_on",
-    "score",
-    "subreddit",
-    "subreddit_id",
-]
+import pandas as pd
 
-COMMENT_COLUMNS = [
-    "author",
-    "body_cleaned",
-    "created_utc",
-    "subreddit",
-    "subreddit_id",
-]
+DATA_DIR = "data"
+INPUT_DIR = f"{DATA_DIR}/input"
+EVENTS_DIR = f"{DATA_DIR}/events"
+OUTPUT_DIR = f"{DATA_DIR}/output"
+FIGURES_DIR = f"{DATA_DIR}/figures"
 
-ALL_USER_COLUMNS = [
-    "author",
-    "automoderator",
-    "bot",
-    "gender",
-    "angry",
-    "anti",
-    "astro",
-    "dangerous",
-    "doom",
-    "military",
-    "nobility",
-    "trump",
-]
+EVENTS_INFO = {
+    "us_elections_2012": {
+        "name": "2012 US presidential election",
+        "date": pd.to_datetime("11-06-2012"),
+    },
+    "us_midterms_2014": {
+        "name": "2014 US midterm elections",
+        "date": pd.to_datetime("11-04-2014"),
+    },
+    "us_elections_2016": {
+        "name": "2016 US presidential election",
+        "date": pd.to_datetime("11-08-2016"),
+    },
+    "us_midterms_2018": {
+        "name": "2018 US midterm elections",
+        "date": pd.to_datetime("11-06-2018"),
+    },
+}
 
-ALL_SUBREDDIT_COLUMNS = [
-    "subreddit",
-    "banned",
-    "gun",
-    "meta",
-    "party",
-    "politician",
-    "region",
-]
-
-CEN_SUBREDDITS = [
-    "worldnews",
-    "politics",
-    "news",
-]
+EVENTS = EVENTS_INFO.keys()
 
 MIN_OCCURENCE_FOR_VOCAB = 25

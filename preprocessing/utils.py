@@ -1,99 +1,131 @@
-"""
-Pre-processing utils
-"""
+import os
+import string
+import re
+import time
 
-import networkx as nx
+import nltk
+from nltk.tokenize import word_tokenize
+
+# import pandas as pd
+import dask.dataframe as dd
 import pandas as pd
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+from constants import EVENTS_DIR, INPUT_DIR
 
 
-def load_network(year: int, weighted=False) -> nx.Graph:
-    """Load subreddits network of given year
+def txt_to_list(data_path):
+    with open(data_path, "r", encoding="utf-8") as file:
+        data = file.read().splitlines()
 
-    Args:
-        year (int): Year
-        weighted (str): weighted vs unweighted
+        return data
 
-    Returns:
-        nx.Graph: networkx graph
-    """
-    network_file = f"/workspaces/polarization_reddit/data/networks/networks_{year}.csv"
 
-    # Load network
-    network = pd.read_csv(network_file)
+def get_files_from_folder(folder_name, compression="bz2"):
+    # return all files as a list
+    files = []
+    for file in os.listdir(folder_name):
+        if file.endswith(f".{compression}"):
+            files.append(f"{folder_name}/{file}")
 
-    # Extract weighted or unweighted network
-    if weighted:
-        graph = nx.Graph()
-        edges = zip(network["node_1"], network["node_2"], network["weighted"])
-        graph.add_weighted_edges_from(edges)
-    else:
-        graph = nx.Graph()
-        edges = zip(
-            network[network.unweighted == 1]["node_1"],
-            network[network.unweighted == 1]["node_2"],
+    return sorted(files)
+
+
+def load_event(event):
+    return pd.read_csv(
+        f"{EVENTS_DIR}/{event}.csv",
+        usecols=["author", "body", "created_utc", "affiliation"],
+    )
+
+
+def load_data(data_path, year, months=None, tokenize=False, comp="bz2", columns=list[str], dev=False):
+    files = get_files_from_folder(f"{data_path}/{year}", compression=comp)
+
+    if months:
+        files = [f for f in files if int(f[-10:-8]) in months]
+
+    print(f"Loading data of {year}...")
+
+    if dev:
+        files = files[:1]
+
+    if comp == "bz2":
+        data = dd.read_csv(
+            files,
+            blocksize=None,  # 500e6 = 500MB
+            usecols=columns,
+            dtype={
+                "subreddit": "string",
+                "author": "string",
+                "body": "string",
+            },
         )
-        graph.add_edges_from(edges)
 
-    return graph
+        # keep only day
+        data["created_utc"] = dd.to_datetime(data["created_utc"], unit="s").dt.date
 
+    elif comp == "parquet":
+        data = dd.read_parquet(files, engine="pyarrow", gather_statistics=True)
+    else:
+        raise NotImplementedError("Compression not allowed.")
 
-def load_comments(
-    year: int, start_month: int = 1, stop_month: int = 12
-) -> pd.DataFrame:
-    """Load all comments in a given year
+    if tokenize:
+        print(f"Tokenizing body... (nr_rows = {len(data)})")
 
-    Args:
-        year (int): year
-        months (list[int], optional): Range of months to load. Defaults to None.
+        tic = time.perf_counter()
 
-    Returns:
-        pd.DataFrame: comments pandas dataframe
-    """
-    comments_folder = f"/workspaces/polarization_reddit/data/comments/comments_{year}"
-    comments = []
-    # Load comments in chunks
-    for month in range(start_month, stop_month + 1):
-        comments_file = f"{comments_folder}/comments_{year}-{month:02}.bz2"
-        for comments_chunk_df in pd.read_json(
-            comments_file,
-            compression="bz2",
-            lines=True,
-            dtype=False,
-            chunksize=1e4,
-        ):
-            comments_chunk_df = comments_chunk_df[
-                (comments_chunk_df.body != "[deleted]")
-            ]
-            comments.append(comments_chunk_df)
+        stopwords = txt_to_list(f"{INPUT_DIR}/stopwords.txt")
 
-    df_comments = pd.concat(comments, ignore_index=True)
+        data["tokens"] = data["body"].apply(
+            lambda x: tokenize_post(x, stopwords, stemmer=True)
+        )
+        toc = time.perf_counter()
 
-    return df_comments
+        print(f"\tTokenized dataframe in {toc - tic:0.4f} seconds")
+    if dev:
+        return data.sample(frac=0.01)
+    return data
 
 
-def load_users() -> pd.DataFrame:
-    """Load all users
+def process_post(text):
+    # lower case
+    text = text.lower()
+    # eliminate urls
+    text = re.sub(r"http\S*|\S*\.com\S*|\S*www\S*", " ", text)
+    # replace all whitespace with a single space
+    text = re.sub(r"\s+", " ", text)
+    # strip off spaces on either end
+    text = text.strip()
 
-    Returns:
-        pd.DataFrame: user dataframe
-    """
-    users = []
-    for users_chunk_df in pd.read_json(
-        "/workspaces/polarization_reddit/data/metadata/users_metadata.json",
-        orient="records",
-        lines=True,
-        chunksize=1e4,
-    ):
-        users_chunk_df = users_chunk_df[
-            (users_chunk_df.bot == 0) & (users_chunk_df.automoderator == 0)
-        ]
-        users.append(users_chunk_df)
-
-    df_users = pd.concat(users, ignore_index=True)
-
-    return df_users
+    return text
 
 
-def save_df_as_json(data: pd.DataFrame, target_file):
-    folder = "/workspaces/polarization_reddit/data/output"
-    data.to_json(f"{folder}/{target_file}", orient="records", lines=True)
+def tokenize_post(text, keep_stopwords=False, stemmer=True):
+    p_text = process_post(text)
+
+    tokens = word_tokenize(p_text)
+    # filter punctuation and digits
+    tokens = filter(
+        lambda token: token not in string.punctuation and not token.isdigit(), tokens
+    )
+
+    if not keep_stopwords:
+        # filter stopwords
+        stopwords = txt_to_list(f"{INPUT_DIR}/stopwords.txt")
+
+        tokens = [t for t in tokens if t not in stopwords]
+    # stem words
+    if stemmer:
+        sno = nltk.stem.LancasterStemmer()  # ("english")
+        tokens = [sno.stem(t) for t in tokens]
+
+    return tokens
+
+
+# Create a SentimentIntensityAnalyzer object.
+sia = SentimentIntensityAnalyzer()
+
+
+def get_sentiment_score(post):
+    post = process_post(post)
+    return sia.polarity_scores(post)["compound"]

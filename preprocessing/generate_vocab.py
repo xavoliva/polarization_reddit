@@ -3,8 +3,8 @@ from collections import Counter
 
 import pandas as pd
 
-from utils.utils import tokenize_post
-from utils.constants import EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB, EVENTS
+from constants import EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB, EVENTS
+from utils import tokenize_post
 
 
 def get_all_vocabs(seed_val):

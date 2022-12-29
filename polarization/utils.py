@@ -76,10 +76,6 @@ def calculate_polarization(left_counts, right_counts):
     return total_pol, left_author_pols, right_author_pols
 
 
-def split_political_affiliation(data):
-    return data[data["affiliation"] == "D"], data[data["affiliation"] == "R"]
-
-
 def get_author_token_counts(posts, vocab):
     authors = posts.groupby('author')
     row_idx = []
