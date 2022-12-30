@@ -4,24 +4,26 @@ Load data constants
 
 DATA_DIR = "/workspaces/polarization_reddit/data"
 
-ALL_COMMENT_COLUMNS = [
-    "author",
-    "body",
-    "body_cleaned",
-    "controversiality",
-    "created_utc",
-    "distinguished",
-    "edited",
-    "gilded",
-    "id",
-    "language",
-    "link_id",
-    "parent_id",
-    "retrieved_on",
-    "score",
-    "subreddit",
-    "subreddit_id",
-]
+COMMENT_DTYPES = {
+    "author": "string",
+    "body": "string",
+    "body_cleaned": "string",
+    "controversiality": "int",
+    "created_utc": "int64",
+    "distinguished": "int",
+    "edited": "int",
+    "gilded": "int",
+    "id": "string",
+    "language": "string",
+    "link_id": "string",
+    "parent_id": "string",
+    "retrieved_on": "int64",
+    "score": "int",
+    "subreddit": "string",
+    "subreddit_id": "string",
+}
+
+ALL_COMMENT_COLUMNS = COMMENT_DTYPES.keys()
 
 COMMENT_COLUMNS = [
     "author",

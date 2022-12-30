@@ -5,7 +5,7 @@ Pre-processing utils
 import networkx as nx
 import pandas as pd
 
-from load.constants import DATA_DIR
+from load.constants import DATA_DIR, COMMENT_DTYPES
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -55,13 +55,15 @@ def load_comments(
     comments = []
     # Load comments in chunks
     for month in range(start_month, stop_month + 1):
-        comments_file = f"{comments_folder}/comments_{year}-{month:02}.bz2"
+        comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.bz2"
         for comments_chunk_df in pd.read_json(
-            comments_file,
+            comments_file_name,
             compression="bz2",
+            orient="records",
             lines=True,
             dtype=False,
             chunksize=1e4,
+            dtype=COMMENT_DTYPES
         ):
             comments_chunk_df = comments_chunk_df[
                 (comments_chunk_df.body != "[deleted]")

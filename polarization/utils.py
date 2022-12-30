@@ -88,7 +88,7 @@ def get_user_token_counts(posts, vocab):
         for post in user_group["body_cleaned"]:
             count = 0
             prev_w = ""
-            for w in tokenize_comment(post, stemmer=False, remove_stopwords=False):
+            for w in tokenize_comment(post, stemmer=False):
                 if w == "":
                     continue
                 if w in vocab:

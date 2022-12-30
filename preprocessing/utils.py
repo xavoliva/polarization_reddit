@@ -2,31 +2,18 @@
 Pre-processing utils
 """
 
-import os
 import time
 import operator
 from collections import Counter
 
-import nltk
+from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
 import dask.dataframe as dd
 import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from load.constants import DATA_DIR
+from load.constants import DATA_DIR, COMMENT_DTYPES
 from preprocessing.constants import EVENTS, EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB
-
-def get_files_from_folder(folder_name: str, file_type: str = "bz2") -> list(str):
-    """
-    returns all file names from a folder as a list
-    """
-    file_names = []
-    for file_name in os.listdir(folder_name):
-        if file_name.endswith(f".{file_type}"):
-            file_names.append(f"{folder_name}/{file_name}")
-
-    return sorted(file_names)
 
 
 def load_event_comments(event: str) -> pd.DataFrame:
@@ -41,62 +28,52 @@ def load_event_comments(event: str) -> pd.DataFrame:
 
 def load_comments_dask(
     year: int,
-    months: list[int] = None,
+    start_month: int = 1,
+    stop_month: int = 12,
     tokenize: bool = False,
     file_type: str = "bz2",
-    columns=list[str],
-    dev: bool = False,
 ) -> dd.DataFrame:
-    file_names = get_files_from_folder(
-        f"{DATA_DIR}/comments/comments_{year}", file_type=file_type
-    )
-
-    if months:
-        file_names = [
-            file_name
-            for file_name in file_names
-            if int(file_name.split(".")[0][-2:]) in months
-        ]
+    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
 
     print(f"Loading data of {year}...")
 
-    if dev:
-        file_names = file_names[:1]
+    comments_file_names = [
+        f"{comments_folder}/comments_{year}-{month:02}.bz2"
+        for month in range(start_month, stop_month + 1)
+    ]
 
     if file_type == "bz2":
-        data = dd.read_csv(
-            file_names,
+        comments = dd.read_json(
+            comments_file_names,
+            compression="bz2",
+            orient="records",
+            lines=True,
             blocksize=None,  # 500e6 = 500MB
-            usecols=columns,
-            dtype={
-                "subreddit": "string",
-                "author": "string",
-                "body_cleaned": "string",
-            },
+            dtype=COMMENT_DTYPES,
         )
 
-        # keep date only
-        data["date"] = dd.to_datetime(data["created_utc"], unit="s").dt.date
+        comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
 
     elif file_type == "parquet":
-        data = dd.read_parquet(file_names, engine="pyarrow", gather_statistics=True)
+        comments = dd.read_parquet(
+            comments_file_names,
+            engine="pyarrow",
+            gather_statistics=True,
+        )
     else:
         raise NotImplementedError(f"Compression {file_type} not allowed.")
 
     if tokenize:
-        print(f"Tokenizing body... (nr_rows = {len(data)})")
+        print(f"Tokenizing body... (nr_rows = {len(comments)})")
 
         tic = time.perf_counter()
 
-        data["tokens"] = data["body_cleaned"].apply(
-            lambda x: tokenize_comment(x, stopwords.words("english"), stemmer=True)
-        )
+        comments["tokens"] = comments["body_cleaned"].apply(tokenize_comment)
         toc = time.perf_counter()
 
         print(f"\tTokenized dataframe in {toc - tic:0.4f} seconds")
-    if dev:
-        return data.sample(frac=0.01)
-    return data
+
+    return comments
 
 
 def split_by_party(data):
@@ -106,20 +83,23 @@ def split_by_party(data):
     return data[data["party"] == "dem"], data[data["party"] == "rep"]
 
 
-def tokenize_comment(text, remove_stopwords=False, stemmer=True) -> list(str):
-    # body_clean is lowercased, without stopwords and URLs, and without
-    # character repetition
+def tokenize_comment(comment: str, stemmer: bool = True) -> list[str]:
+    """
+    Tokenize comment
 
-    tokens = word_tokenize(text)
+    Note: body_clean is lowercased, without stopwords and URLs, and without
+    character repetition
+    """
+
+    tokens = word_tokenize(comment)
+
     # filter out punctuation
     tokens = [token for token in tokens if token.isalnum()]
 
-    if remove_stopwords:
-        tokens = [t for t in tokens if t not in stopwords.words("english")]
     # stem words
     if stemmer:
-        sno = nltk.stem.LancasterStemmer()  # ("english")
-        tokens = [sno.stem(t) for t in tokens]
+        sno = LancasterStemmer()  # ("english")
+        tokens = [sno.stem(token) for token in tokens]
 
     return tokens
 
@@ -131,7 +111,7 @@ def get_sentiment_score(comment):
     return sia.polarity_scores(comment)["compound"]
 
 
-def calculate_user_party(user_comments: pd.DataFrameGroupBy) -> pd.Series:
+def calculate_user_party(user_comments) -> pd.Series:
     user_party = {}
 
     dem_cnt = len(user_comments[user_comments["party"] == "dem"])
