@@ -4,194 +4,212 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from constants import EVENTS_DIR, RNG
-from utils import tokenize_post
+from preprocessing.constants import EVENTS_DIR
+from preprocessing.utils import tokenize_comment, split_by_party
+
+RNG = np.random.default_rng(42)
 
 
-def get_party_q(party_counts, exclude_author=None):
-    author_sum = party_counts.sum(axis=0)
+def get_party_q(party_counts, exclude_user=None):
+    user_sum = party_counts.sum(axis=0)
 
-    if exclude_author:
-        author_sum -= party_counts[exclude_author, :]
+    if exclude_user:
+        user_sum -= party_counts[exclude_user, :]
 
-    total_sum = author_sum.sum()
+    total_sum = user_sum.sum()
 
-    return author_sum / total_sum
-
-
-def get_rho(left_q, right_q):
-    return (left_q / (left_q + right_q)).transpose()
+    return user_sum / total_sum
 
 
-def calculate_polarization(left_counts, right_counts):
-    left_author_total = left_counts.sum(axis=1)
-    right_author_total = right_counts.sum(axis=1)
+def get_rho(dem_q, rep_q):
+    return (dem_q / (dem_q + rep_q)).transpose()
+
+
+def calculate_polarization(dem_user_token_cnt, rep_user_token_cnt):
+    dem_user_total = dem_user_token_cnt.sum(axis=1)
+    rep_user_total = rep_user_token_cnt.sum(axis=1)
 
     # get row-wise distributions
-    left_author_distr = (
-        sp.diags(1 / left_author_total.A.ravel())).dot(left_counts)
-    right_author_distr = (
-        sp.diags(1 / right_author_total.A.ravel())).dot(right_counts)
+    dem_user_distr = (sp.diags(1 / dem_user_total.A.ravel())).dot(dem_user_token_cnt)
+    rep_user_distr = (sp.diags(1 / rep_user_total.A.ravel())).dot(rep_user_token_cnt)
 
-    nr_left_authors = left_counts.shape[0]
-    nr_right_authors = right_counts.shape[0]
+    nr_dem_users = dem_user_token_cnt.shape[0]
+    nr_rep_users = rep_user_token_cnt.shape[0]
 
     # make sure there are no zero rows
-    assert set(left_author_total.nonzero()[0]) == set(range(nr_left_authors))
+    assert set(dem_user_total.nonzero()[0]) == set(range(nr_dem_users))
     # make sure there are no zero rows
-    assert set(right_author_total.nonzero()[0]) == set(range(nr_right_authors))
+    assert set(rep_user_total.nonzero()[0]) == set(range(nr_rep_users))
 
-    left_q = get_party_q(left_counts)
-    right_q = get_party_q(right_counts)
+    dem_q = get_party_q(dem_user_token_cnt)
+    rep_q = get_party_q(rep_user_token_cnt)
 
-    left_author_pols = []
-    right_author_pols = []
+    dem_user_polarizations = []
+    rep_user_polarizations = []
 
-    left_sum = 0
-    for i in range(nr_left_authors):
-        left_leaveout_q = get_party_q(left_counts, i)
-        token_scores_left = get_rho(left_leaveout_q, right_q)
+    dem_polarization_sum = 0
+    for i in range(nr_dem_users):
+        dem_leaveout_q = get_party_q(dem_user_token_cnt, i)
+        dem_token_scores = get_rho(dem_leaveout_q, rep_q)
 
-        left_author_pol = left_author_distr[i, :].dot(token_scores_left)[0, 0]
-        left_author_pols.append(left_author_pol)
+        dem_user_polarization = dem_user_distr[i, :].dot(dem_token_scores)[0, 0]
+        dem_user_polarizations.append(dem_user_polarization)
 
-        left_sum += left_author_pol
+        dem_polarization_sum += dem_user_polarization
 
-    right_sum = 0
-    for i in range(nr_right_authors):
-        right_leaveout_q = get_party_q(right_counts, i)
-        token_scores_right = 1. - get_rho(left_q, right_leaveout_q)
+    rep_polarization_sum = 0
+    for i in range(nr_rep_users):
+        rep_leaveout_q = get_party_q(rep_user_token_cnt, i)
+        rep_token_scores = 1.0 - get_rho(dem_q, rep_leaveout_q)
 
-        right_author_pol = right_author_distr[i, :].dot(token_scores_right)[
-            0, 0]
-        right_author_pols.append(right_author_pol)
+        rep_user_polarization = rep_user_distr[i, :].dot(rep_token_scores)[0, 0]
+        rep_user_polarizations.append(rep_user_polarization)
 
-        right_sum += right_author_pol
+        rep_polarization_sum += rep_user_polarization
 
-    left_val = 1 / nr_left_authors * left_sum
-    right_val = 1 / nr_right_authors * right_sum
+    dem_total_polarization = 1 / nr_dem_users * dem_polarization_sum
+    rep_total_polarization = 1 / nr_rep_users * rep_polarization_sum
 
-    total_pol = 1/2 * (left_val + right_val)
+    total_pol = 1 / 2 * (dem_total_polarization + rep_total_polarization)
 
-    return total_pol, left_author_pols, right_author_pols
+    return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def get_author_token_counts(posts, vocab):
-    authors = posts.groupby('author')
+def get_user_token_counts(posts, vocab):
+    users = posts.groupby("author")
     row_idx = []
     col_idx = []
     data = []
-    for author_idx, (author, author_group), in enumerate(authors):
+    for (
+        user_idx,
+        (_, user_group),
+    ) in enumerate(users):
         word_indices = []
-        for post in author_group['body']:
+        for post in user_group["body_cleaned"]:
             count = 0
-            prev_w = ''
-            for w in tokenize_post(post, stemmer=False, keep_stopwords=False):
-                if w == '':
+            prev_w = ""
+            for w in tokenize_comment(post, stemmer=False, remove_stopwords=False):
+                if w == "":
                     continue
                 if w in vocab:
                     word_indices.append(vocab[w])
                 if count > 0:
-                    bigram = prev_w + ' ' + w
+                    bigram = prev_w + " " + w
                     if bigram in vocab:
                         word_indices.append(vocab[bigram])
                 count += 1
                 prev_w = w
 
         for word_idx, count in Counter(word_indices).items():
-            row_idx.append(author_idx)
+            row_idx.append(user_idx)
             col_idx.append(word_idx)
             data.append(count)
 
-    return sp.csr_matrix((data, (row_idx, col_idx)), shape=(len(authors), len(vocab)))
+    return sp.csr_matrix((data, (row_idx, col_idx)), shape=(len(users), len(vocab)))
 
 
-def get_polarization(event, data, default_score=0.5):
+def get_polarization(event, comments, default_score=0.5):
     """
     Measure polarization.
     event: name of the event
-    data: dataframe with 'body' and 'author'
+    data: dataframe with 'body_cleaned' and 'user'
     default_score: default token partisanship score
     """
     # get partisan posts
-    left_posts, right_posts = split_political_affiliation(data)
+    dem_comments, rep_comments = split_by_party(comments)
 
     # get vocab
-    vocab = {w: i for i, w in
-             enumerate(open(f"{EVENTS_DIR}/{event}_tokens.txt", "r").read().splitlines())}
+    vocab = {
+        w: i
+        for i, w in enumerate(
+            open(f"{EVENTS_DIR}/{event}_tokens.txt", "r", encoding="utf-8")
+            .read()
+            .splitlines()
+        )
+    }
 
-    left_counts = get_author_token_counts(left_posts, vocab)
-    right_counts = get_author_token_counts(right_posts, vocab)
+    dem_user_token_cnt = get_user_token_counts(dem_comments, vocab)
+    rep_user_token_cnt = get_user_token_counts(rep_comments, vocab)
 
-    left_author_len = left_counts.shape[0]
-    right_author_len = right_counts.shape[0]
+    dem_user_cnt = dem_user_token_cnt.shape[0]
+    rep_user_cnt = rep_user_token_cnt.shape[0]
 
-    if left_author_len < 10 or right_author_len < 10:
+    if dem_user_cnt < 10 or rep_user_cnt < 10:
         # return these values when there is not enough data to make predictions on
-        return (default_score, default_score, left_author_len + right_author_len), ([], [])
+        return (default_score, default_score, dem_user_cnt + rep_user_cnt), ([], [])
 
-    # make the prior neutral (i.e. make sure there are the same number of left and right authors)
-    left_author_len = left_counts.shape[0]
-    right_author_len = right_counts.shape[0]
+    # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
+    if dem_user_cnt > rep_user_cnt:
+        dem_user_sample = np.array(RNG.sample(range(dem_user_cnt), rep_user_cnt))
+        dem_user_token_cnt = dem_user_token_cnt[dem_user_sample, :]
+        dem_user_cnt = dem_user_token_cnt.shape[0]
+    elif rep_user_cnt > dem_user_cnt:
+        rep_user_sample = np.array(RNG.sample(range(rep_user_cnt), dem_user_cnt))
+        rep_user_token_cnt = rep_user_token_cnt[rep_user_sample, :]
+        rep_user_cnt = rep_user_token_cnt.shape[0]
 
-    if left_author_len > right_author_len:
-        left_subset = np.array(RNG.sample(
-            range(left_author_len), right_author_len))
-        left_counts = left_counts[left_subset, :]
-        left_author_len = left_counts.shape[0]
-    elif right_author_len > left_author_len:
-        right_subset = np.array(RNG.sample(
-            range(right_author_len), left_author_len))
-        right_counts = right_counts[right_subset, :]
-        right_author_len = right_counts.shape[0]
+    assert dem_user_cnt == rep_user_cnt
 
-    assert (left_author_len == right_author_len)
-
-    all_counts = sp.vstack([left_counts, right_counts])
+    all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
 
     wordcounts = all_counts.nonzero()[1]
 
     # filter words used by fewer than 2 people
-    all_counts = all_counts[:, np.array(
-        [(np.count_nonzero(wordcounts == i) > 1) for i in range(all_counts.shape[1])])]
+    all_counts = all_counts[
+        :,
+        np.array(
+            [
+                (np.count_nonzero(wordcounts == i) > 1)
+                for i in range(all_counts.shape[1])
+            ]
+        ),
+    ]
 
-    left_counts = all_counts[:left_author_len, :]
-    right_counts = all_counts[left_author_len:, :]
+    dem_user_token_cnt = all_counts[:dem_user_cnt, :]
+    rep_user_token_cnt = all_counts[dem_user_cnt:, :]
 
-    left_nonzero = set(left_counts.nonzero()[0])
-    right_nonzero = set(right_counts.nonzero()[0])
+    dem_nonzero = set(dem_user_token_cnt.nonzero()[0])
+    rep_nonzero = set(rep_user_token_cnt.nonzero()[0])
 
-    # filter authors who did not use words from vocab
-    left_counts = left_counts[np.array([(i in left_nonzero) for i in range(
-        left_counts.shape[0])]), :]
-    right_counts = right_counts[np.array(
-        [(i in right_nonzero) for i in range(right_counts.shape[0])]), :]
+    # filter users who did not use words from vocab
+    dem_user_token_cnt = dem_user_token_cnt[
+        np.array([(i in dem_nonzero) for i in range(dem_user_token_cnt.shape[0])]), :
+    ]
+    rep_user_token_cnt = rep_user_token_cnt[
+        np.array([(i in rep_nonzero) for i in range(rep_user_token_cnt.shape[0])]), :
+    ]
 
-    pol_val, left_pol_vals, right_pol_vals = calculate_polarization(
-        left_counts, right_counts)
+    (
+        total_polarization,
+        dem_user_polarizations,
+        rep_user_polarizations,
+    ) = calculate_polarization(dem_user_token_cnt, rep_user_token_cnt)
 
-    all_counts = sp.vstack([left_counts, right_counts])
+    all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
     index = np.arange(all_counts.shape[0])
     RNG.shuffle(index)
     shuffled_all_counts = all_counts[index, :]
 
-    # Calculate polarization with random assignment of authors
-    random_val, _, _ = calculate_polarization(shuffled_all_counts[:left_counts.shape[0], :],
-                                              shuffled_all_counts[left_counts.shape[0]:, :])
+    # Calculate polarization with random assignment of users
+    random_polarization, _, _ = calculate_polarization(
+        shuffled_all_counts[: dem_user_token_cnt.shape[0], :],
+        shuffled_all_counts[dem_user_token_cnt.shape[0] :, :],
+    )
 
-    author_len = left_author_len + right_author_len
+    user_cnt = dem_user_cnt + rep_user_cnt
 
-    return (pol_val, random_val, author_len), (left_pol_vals, right_pol_vals)
+    return (total_polarization, random_polarization, user_cnt), (
+        dem_user_polarizations,
+        rep_user_polarizations,
+    )
 
 
 def split_by_day(data):
-    return [(v, k) for k, v in data.groupby("created_utc")]
+    return [(v, k) for k, v in data.groupby("date")]
 
 
 def split_by_week(data):
-    data.created_utc = pd.to_datetime(data["created_utc"])
-
-    return [(v, k) for k, v in data.groupby(pd.Grouper(key="created_utc", freq="W"))]
+    return [(v, k) for k, v in data.groupby(pd.Grouper(key="date", freq="W"))]
 
 
 def get_polarization_by_time(event, data, freq="day"):
@@ -200,10 +218,16 @@ def get_polarization_by_time(event, data, freq="day"):
     elif freq == "week":
         data_time = split_by_week(data)
 
-    pol = []
+    polarization = []
     for date_data, date in data_time:
-        pol_data, _ = get_polarization(event, date_data)
-        pol_val, random_val, author_len = pol_data
-        pol.append((pol_val, random_val, author_len, pd.to_datetime(date)))
+        (total_polarization, random_polarization, user_cnt), _ = get_polarization(
+            event, date_data
+        )
+        polarization.append(
+            (total_polarization, random_polarization, user_cnt, pd.to_datetime(date))
+        )
 
-    return pd.DataFrame(pol, columns=["pol", "random_pol", "author_len", "created_utc"])
+    return pd.DataFrame(
+        polarization,
+        columns=["polarization", "random_polarization", "user_cnt", "date"],
+    )

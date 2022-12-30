@@ -3,10 +3,10 @@ Pre-processing constants
 """
 import pandas as pd
 
-DATA_DIR = "data"
+from load.constants import DATA_DIR
+
 EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
-FIGURES_DIR = f"{DATA_DIR}/figures"
 
 EVENTS_INFO = {
     "us_elections_2012": {
@@ -27,7 +27,10 @@ EVENTS_INFO = {
     },
 }
 
-ELECTIONS_REGEX = "vote|us|election|trump|hillary|president|candidate|democrat|republican|donald|clinton|reps|dems|elect|ballot|crooked|swing"
+ELECTIONS_REGEX = (
+    "vote|us|election|trump|hillary|president|candidate|democrat|republican|"
+    "donald|clinton|reps|dems|elect|ballot|crooked|swing"
+)
 
 EVENTS = EVENTS_INFO.keys()
 

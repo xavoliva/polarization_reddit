@@ -5,7 +5,7 @@ Pre-processing utils
 import networkx as nx
 import pandas as pd
 
-from constants import DATA_DIR
+from load.constants import DATA_DIR
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -113,6 +113,13 @@ def load_subreddits() -> pd.DataFrame:
     subreddits_df = subreddits_df[(subreddits_df["region"] == "")]
 
     return subreddits_df
+
+
+def load_txt_to_list(file_path: str) -> list(str):
+    with open(file_path, "r", encoding="utf-8") as file:
+        data = file.read().splitlines()
+
+        return data
 
 
 def save_df_as_json(data: pd.DataFrame, target_file: str):

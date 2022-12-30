@@ -3,8 +3,6 @@ Pre-processing utils
 """
 
 import os
-import string
-import re
 import time
 import operator
 from collections import Counter
@@ -16,79 +14,82 @@ import dask.dataframe as dd
 import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from constants import EVENTS, EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB
+from load.constants import DATA_DIR
+from preprocessing.constants import EVENTS, EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB
+
+def get_files_from_folder(folder_name: str, file_type: str = "bz2") -> list(str):
+    """
+    returns all file names from a folder as a list
+    """
+    file_names = []
+    for file_name in os.listdir(folder_name):
+        if file_name.endswith(f".{file_type}"):
+            file_names.append(f"{folder_name}/{file_name}")
+
+    return sorted(file_names)
 
 
-def txt_to_list(data_path: str) -> list(str):
-    with open(data_path, "r", encoding="utf-8") as file:
-        data = file.read().splitlines()
-
-        return data
-
-
-def get_files_from_folder(folder_name: str, compression: str = "bz2") -> list(str):
-    # return all files as a list
-    files = []
-    for file in os.listdir(folder_name):
-        if file.endswith(f".{compression}"):
-            files.append(f"{folder_name}/{file}")
-
-    return sorted(files)
-
-
-def load_event(event: str) -> pd.DataFrame:
+def load_event_comments(event: str) -> pd.DataFrame:
+    """
+    Load dataframe from event
+    """
     return pd.read_csv(
         f"{EVENTS_DIR}/{event}.csv",
-        usecols=["author", "body", "created_utc", "affiliation"],
+        usecols=["author", "body_cleaned", "created_utc", "party"],
     )
 
 
-def load_data(
-    data_path: str,
+def load_comments_dask(
     year: int,
     months: list[int] = None,
     tokenize: bool = False,
-    comp: str = "bz2",
+    file_type: str = "bz2",
     columns=list[str],
     dev: bool = False,
-):
-    files = get_files_from_folder(f"{data_path}/{year}", compression=comp)
+) -> dd.DataFrame:
+    file_names = get_files_from_folder(
+        f"{DATA_DIR}/comments/comments_{year}", file_type=file_type
+    )
 
     if months:
-        files = [f for f in files if int(f[-10:-8]) in months]
+        file_names = [
+            file_name
+            for file_name in file_names
+            if int(file_name.split(".")[0][-2:]) in months
+        ]
 
     print(f"Loading data of {year}...")
 
     if dev:
-        files = files[:1]
+        file_names = file_names[:1]
 
-    if comp == "bz2":
+    if file_type == "bz2":
         data = dd.read_csv(
-            files,
+            file_names,
             blocksize=None,  # 500e6 = 500MB
             usecols=columns,
             dtype={
                 "subreddit": "string",
                 "author": "string",
-                "body": "string",
+                "body_cleaned": "string",
             },
         )
 
-        # keep only day
+        # keep date only
         data["created_utc"] = dd.to_datetime(data["created_utc"], unit="s").dt.date
 
-    elif comp == "parquet":
-        data = dd.read_parquet(files, engine="pyarrow", gather_statistics=True)
+    elif file_type == "parquet":
+        data = dd.read_parquet(file_names, engine="pyarrow", gather_statistics=True)
     else:
-        raise NotImplementedError("Compression not allowed.")
+        raise NotImplementedError(f"Compression {file_type} not allowed.")
 
     if tokenize:
         print(f"Tokenizing body... (nr_rows = {len(data)})")
 
         tic = time.perf_counter()
 
-        data["tokens"] = data["body"].apply(
-            lambda x: tokenize_post(x, stopwords.words("english"), stemmer=True)
+        data["tokens"] = data["body_cleaned"].apply(
+            lambda x: tokenize_comment(x, stopwords.words("english"), stemmer=True)
         )
         toc = time.perf_counter()
 
@@ -98,31 +99,23 @@ def load_data(
     return data
 
 
-def process_post(text: str) -> str:
-    # lower case
-    text = text.lower()
-    # eliminate urls
-    text = re.sub(r"http\S*|\S*\.com\S*|\S*www\S*", " ", text)
-    # replace all whitespace with a single space
-    text = re.sub(r"\s+", " ", text)
-    # strip off spaces on either end
-    text = text.strip()
-
-    return text
+def split_by_party(data):
+    """
+    split dataframe by party
+    """
+    return data[data["party"] == "dem"], data[data["party"] == "rep"]
 
 
-def tokenize_post(text, keep_stopwords=False, stemmer=True):
-    p_text = process_post(text)
+def tokenize_comment(text, remove_stopwords=False, stemmer=True) -> list(str):
+    # body_clean is lowercased, without stopwords and URLs, and without
+    # character repetition
 
-    tokens = word_tokenize(p_text)
-    # filter punctuation and digits
-    tokens = filter(
-        lambda token: token not in string.punctuation and not token.isdigit(), tokens
-    )
+    tokens = word_tokenize(text)
+    # filter out punctuation
+    tokens = [token for token in tokens if token.isalnum()]
 
-    if not keep_stopwords:
-        # filter stopwords
-        tokens = [t for t in tokens if t not in stopwords.words('english')]
+    if remove_stopwords:
+        tokens = [t for t in tokens if t not in stopwords.words("english")]
     # stem words
     if stemmer:
         sno = nltk.stem.LancasterStemmer()  # ("english")
@@ -131,15 +124,14 @@ def tokenize_post(text, keep_stopwords=False, stemmer=True):
     return tokens
 
 
-def get_sentiment_score(post):
+def get_sentiment_score(comment):
     # Create a SentimentIntensityAnalyzer object
     sia = SentimentIntensityAnalyzer()
 
-    post = process_post(post)
-    return sia.polarity_scores(post)["compound"]
+    return sia.polarity_scores(comment)["compound"]
 
 
-def calculate_user_party(user_comments: pd.Da):
+def calculate_user_party(user_comments: pd.DataFrameGroupBy) -> pd.Series:
     user_party = {}
 
     dem_cnt = len(user_comments[user_comments["party"] == "dem"])
@@ -163,15 +155,13 @@ def calculate_user_party(user_comments: pd.Da):
 def get_all_vocabs(seed_val):
     vocabs = []
     for event in EVENTS:
-        data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body"])
+        data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body_cleaned"])
 
         # print(e, len(data))
         # sample a (quasi-)equal number of tweets from each event
         # this has to be done to eliminate words that are too specific to a particular event
         data = data.sample(min(len(data), 10000), random_state=seed_val)
-        word_counts = Counter(
-            tokenize_post(" ".join(data["body"]), keep_stopwords=True)
-        )
+        word_counts = Counter(tokenize_comment(" ".join(data["body_cleaned"])))
         vocab = []
         for word, cnt in word_counts.items():
             if cnt >= 10:  # keep words that occur at least 10 times
@@ -220,9 +210,9 @@ def build_vocab(corpus):
 
 
 def build_event_vocab(event):
-    data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body"])
+    data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body_cleaned"])
 
-    corpus = tokenize_post(" ".join(data["body"]), stemmer=False, keep_stopwords=False)
+    corpus = tokenize_comment(" ".join(data["body_cleaned"]), stemmer=False)
 
     vocab = build_vocab(corpus)
     print("Vocab length:", len(vocab))

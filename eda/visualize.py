@@ -1,16 +1,17 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
+import dask.dataframe as dd
 
-from constants import FIGURES_DIR
-from utils import get_sentiment_score
+from eda.constants import FIGURES_DIR, FIG_SIZE
+from preprocessing.utils import get_sentiment_score
 
-sns.set(rc={"figure.figsize": (20, 6)})
+sns.set(rc={"figure.figsize": FIG_SIZE})
 
 
-def barplot_top(df, column, year, n=10):
-    top = df[[column]].groupby(by=column).size().nlargest(n=n).compute()
+def barplot_top(comments: dd.DataFrame, column: str, year: int, n: int = 10):
+    top_comments = comments[[column]].groupby(by=column).size().nlargest(n=n).compute()
 
-    ax = sns.barplot(x=top.index, y=top.values)
+    ax = sns.barplot(x=top_comments.index, y=top_comments.values)
     if n > 15:
         ax.set(xticklabels=[])
     ax.set_title(f"Most active {column}s ({year})")
@@ -25,10 +26,10 @@ def barplot_top(df, column, year, n=10):
     plt.show()
 
 
-def plot_daily_comments(df, year):
-    df_d = df[["created_utc"]].groupby(by="created_utc").size().compute()
+def plot_daily_comments(comments: dd.DataFrame, year: int):
+    daily_comments = comments[["date"]].groupby(by="date").size().compute()
 
-    ax = sns.lineplot(x=df_d.index, y=df_d.values)
+    ax = sns.lineplot(x=daily_comments.index, y=daily_comments.values)
 
     ax.set_title(f"Number of daily comments ({year})")
     ax.set_ylabel("Number of comments")
@@ -43,16 +44,17 @@ def plot_daily_comments(df, year):
     plt.show()
 
 
-def plot_daily_sentiment(df, year):
-    df["sentiment"] = df.body.apply(get_sentiment_score, meta=("body", "float"))
-    df_d = (
-        df[["created_utc", "sentiment"]]
-        .groupby(by="created_utc")["sentiment"]
-        .mean()
-        .compute()
+def plot_daily_sentiment(comments: dd.DataFrame, year: int):
+    comments["sentiment"] = comments["body_cleaned"].apply(
+        get_sentiment_score, meta=("body_cleaned", "float")
+    )
+    comments_daily_sentiment = (
+        comments[["date", "sentiment"]].groupby(by="date")["sentiment"].mean().compute()
     )
 
-    ax = sns.lineplot(x=df_d.index, y=df_d.values)
+    ax = sns.lineplot(
+        x=comments_daily_sentiment.index, y=comments_daily_sentiment.values
+    )
 
     ax.set_title(f"Daily mean sentiment scores ({year})")
     ax.set_ylabel("Sentiment Score")

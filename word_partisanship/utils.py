@@ -47,7 +47,3 @@ def get_priors(tokens):
         freqs[word] = counts[word] / total
 
     return freqs
-
-
-def split_political_affiliation(data):
-    return data[data["affiliation"] == "D"], data[data["affiliation"] == "R"]
