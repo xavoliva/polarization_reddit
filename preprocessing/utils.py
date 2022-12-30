@@ -76,7 +76,7 @@ def load_comments_dask(
         )
 
         # keep date only
-        data["created_utc"] = dd.to_datetime(data["created_utc"], unit="s").dt.date
+        data["date"] = dd.to_datetime(data["created_utc"], unit="s").dt.date
 
     elif file_type == "parquet":
         data = dd.read_parquet(file_names, engine="pyarrow", gather_statistics=True)
