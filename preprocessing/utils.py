@@ -1,79 +1,21 @@
 """
 Pre-processing utils
 """
-
-import time
-import operator
-from collections import Counter
+import json
 
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
-import dask.dataframe as dd
 import pandas as pd
+import dask.dataframe as dd
+from sklearn.feature_extraction.text import CountVectorizer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-from load.constants import DATA_DIR, COMMENT_DTYPES
-from preprocessing.constants import EVENTS, EVENTS_DIR, MIN_OCCURENCE_FOR_VOCAB
+from preprocessing.constants import (
+    EVENTS_DIR,
+)
 
 
-def load_event_comments(event: str) -> pd.DataFrame:
-    """
-    Load dataframe from event
-    """
-    return pd.read_csv(
-        f"{EVENTS_DIR}/{event}.csv",
-        usecols=["author", "body_cleaned", "created_utc", "party"],
-    )
-
-
-def load_comments_dask(
-    year: int,
-    start_month: int = 1,
-    stop_month: int = 12,
-    tokenize: bool = False,
-    file_type: str = "bz2",
-) -> dd.DataFrame:
-    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
-
-    print(f"Loading data of {year}...")
-
-    comments_file_names = [
-        f"{comments_folder}/comments_{year}-{month:02}.bz2"
-        for month in range(start_month, stop_month + 1)
-    ]
-
-    if file_type == "bz2":
-        comments = dd.read_json(
-            comments_file_names,
-            compression="bz2",
-            orient="records",
-            lines=True,
-            blocksize=None,  # 500e6 = 500MB
-            dtype=COMMENT_DTYPES,
-        )
-
-        comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
-
-    elif file_type == "parquet":
-        comments = dd.read_parquet(
-            comments_file_names,
-            engine="pyarrow",
-            gather_statistics=True,
-        )
-    else:
-        raise NotImplementedError(f"Compression {file_type} not allowed.")
-
-    if tokenize:
-        print(f"Tokenizing body... (nr_rows = {len(comments)})")
-
-        tic = time.perf_counter()
-
-        comments["tokens"] = comments["body_cleaned"].apply(tokenize_comment)
-        toc = time.perf_counter()
-
-        print(f"\tTokenized dataframe in {toc - tic:0.4f} seconds")
-
-    return comments
+sno = LancasterStemmer()  # ("english")
 
 
 def split_by_party(data):
@@ -83,7 +25,7 @@ def split_by_party(data):
     return data[data["party"] == "dem"], data[data["party"] == "rep"]
 
 
-def tokenize_comment(comment: str, stemmer: bool = True) -> list[str]:
+def tokenize_comment(comment: str, stemmer: bool = True) -> str:
     """
     Tokenize comment
 
@@ -98,13 +40,61 @@ def tokenize_comment(comment: str, stemmer: bool = True) -> list[str]:
 
     # stem words
     if stemmer:
-        sno = LancasterStemmer()  # ("english")
         tokens = [sno.stem(token) for token in tokens]
 
-    return tokens
+    return " ".join(tokens)
 
 
-def get_sentiment_score(comment):
+def load_event_comments(
+    event_name: str, file_type: str = "parquet"
+) -> (pd.DataFrame | dd.DataFrame):
+    """
+    Load dataframe from event
+    """
+    comments_file = f"{EVENTS_DIR}/{event_name}_comments"
+
+    if file_type == "csv":
+        event_comments = pd.read_csv(
+            f"{comments_file}.csv",
+            usecols=["author", "body_cleaned", "created_utc", "party"],
+        )
+    elif file_type == "parquet":
+        event_comments = dd.read_parquet(
+            comments_file,
+            engine="pyarrow",
+        )
+    else:
+        raise NotImplementedError(f"File type {file_type} not allowed.")
+
+    return event_comments
+
+
+def save_event_comments(event_comments, event_name: str, file_type: str = "parquet"):
+    """
+    Save event dataframe
+    """
+    if file_type == "csv":
+        event_comments.to_csv(
+            f"{EVENTS_DIR}/{event_name}_comments.parquet",
+            engine="pyarrow",
+            compression="snappy",
+        )
+    elif file_type == "parquet":
+        event_comments.to_parquet(
+            f"{EVENTS_DIR}/{event_name}_comments.parquet",
+            engine="pyarrow",
+            compression="snappy",
+        )
+    else:
+        raise NotImplementedError(f"File type {file_type} not allowed.")
+
+
+def save_event_vocab(event_vocab: dict[str, int], event_name: str):
+    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "w", encoding="utf-8") as fp:
+        json.dump(event_vocab, fp)
+
+
+def get_sentiment_score(comment: str) -> float:
     # Create a SentimentIntensityAnalyzer object
     sia = SentimentIntensityAnalyzer()
 
@@ -132,69 +122,7 @@ def calculate_user_party(user_comments) -> pd.Series:
     return pd.Series(user_party)
 
 
-def get_all_vocabs(seed_val):
-    vocabs = []
-    for event in EVENTS:
-        data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body_cleaned"])
-
-        # print(e, len(data))
-        # sample a (quasi-)equal number of tweets from each event
-        # this has to be done to eliminate words that are too specific to a particular event
-        data = data.sample(min(len(data), 10000), random_state=seed_val)
-        word_counts = Counter(tokenize_comment(" ".join(data["body_cleaned"])))
-        vocab = []
-        for word, cnt in word_counts.items():
-            if cnt >= 10:  # keep words that occur at least 10 times
-                vocab.append(word)
-        vocabs.append(set(vocab))
-    return vocabs
-
-
-def word_event_count(vocabs):
-    word_event_cnt = {}
-    for vocab in vocabs:
-        for word in vocab:
-            if word in word_event_cnt:
-                word_event_cnt[word] += 1
-            else:
-                word_event_cnt[word] = 1
-    # Keep all words that occur in at least three events' tweets. Note that we keep stopwords.
-    keep = [
-        word
-        for word, cnt in sorted(
-            word_event_cnt.items(), key=operator.itemgetter(1), reverse=True
-        )
-        if (cnt > 2 and not word.isdigit())
-    ]
-    print(len(keep))
-    return set(keep)
-
-
-def build_vocab(corpus):
-    uni_and_bigrams = Counter(corpus)
-
-    for i in range(1, len(corpus)):
-        word = corpus[i]
-        prev_word = corpus[i - 1]
-        uni_and_bigrams.update([" ".join([prev_word, word])])
-
-    vocab = [
-        word
-        for word, cnt in sorted(
-            uni_and_bigrams.items(), key=operator.itemgetter(1), reverse=True
-        )
-        if cnt > MIN_OCCURENCE_FOR_VOCAB
-    ]
-
-    return vocab
-
-
-def build_event_vocab(event):
-    data = pd.read_csv(f"{EVENTS_DIR}/{event}.csv", usecols=["body_cleaned"])
-
-    corpus = tokenize_comment(" ".join(data["body_cleaned"]), stemmer=False)
-
-    vocab = build_vocab(corpus)
-    print("Vocab length:", len(vocab))
-
-    return vocab
+def build_vocab(corpus: pd.Series, min_words: int) -> dict[str, int]:
+    vec = CountVectorizer(analyzer="word", ngram_range=(1, 2), min_df=min_words)
+    vec.fit_transform(corpus)
+    return vec.vocabulary_

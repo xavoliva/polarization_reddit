@@ -3,7 +3,7 @@ METADATA=$2
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-if [ $YEAR -gt 0 ];
+if [ $YEAR -gt 2000 ];
 then
     echo $YEAR
 
@@ -21,7 +21,7 @@ then
     curl https://zenodo.org/record/5851729/files/networks_$YEAR.csv?download=1 -o $SCRIPT_DIR/networks/networks_$YEAR.csv
 fi
 
-if [ $METADATA -eq 1 ];
+if [ $METADATA -eq "1" ];
 then
     echo "Download metadata"
     mkdir -p $SCRIPT_DIR/metadata

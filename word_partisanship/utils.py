@@ -1,49 +1,36 @@
 import math
-from collections import Counter
-from heapq import nlargest, nsmallest
+from collections import defaultdict
 
 
-def logodds_with_prior(one_tokens, two_tokens, display=25, priors=None):
-    types = set(one_tokens + two_tokens)
+def logodds_with_prior(
+    vocab: dict[str, int],
+    dem_vocab: dict[str, int],
+    rep_vocab: dict[str, int],
+) -> dict[str, float]:
+    """
+    Weighted log odds ratio, as defined in
+    https://bookdown.org/Maxine/tidy-text-mining/weighted-log-odds-ratio.html
+    """
 
-    V = len(types)
+    nr_tokens = sum(vocab.values())
+    nr_dem_tokens = sum(dem_vocab.values())
+    nr_rep_tokens = sum(rep_vocab.values())
 
-    n_one = len(one_tokens)
-    n_two = len(two_tokens)
+    logodds = defaultdict(float)
 
-    y_one = Counter(one_tokens)
-    y_two = Counter(two_tokens)
+    for word in vocab.keys():
+        dem_numerator = dem_vocab[word] + vocab[word]
+        dem_denominator = nr_dem_tokens + nr_tokens - dem_numerator
 
-    xi = {}
+        rep_numerator = rep_vocab[word] + vocab[word]
+        rep_denominator = nr_rep_tokens + nr_tokens - rep_numerator
 
-    if priors:
-        alpha_0 = 1000
-    else:
-        alpha_w = 0.01
-        alpha_0 = V * alpha_w
+        raw_logodds = math.log(dem_numerator / dem_denominator) - math.log(
+        rep_numerator / rep_denominator
+        )
 
-    for w in types:
-        if priors:
-            alpha_w = priors[w] * alpha_0
+        variance = (1 / dem_numerator) + (1 / rep_numerator)
 
-        d_hat = math.log((y_one[w] + alpha_w) / (n_one + alpha_0 - y_one[w] - alpha_w)) - \
-            math.log((y_two[w] + alpha_w) /
-                     (n_two + alpha_0 - y_two[w] - alpha_w))
+        logodds[word] = raw_logodds / math.sqrt(variance)
 
-        sigma_squared = 1 / (y_one[w] + alpha_w) + 1 / (y_two[w] + alpha_w)
-
-        xi[w] = d_hat / math.sqrt(sigma_squared)
-
-    return nlargest(display, xi, key=xi.get), nsmallest(display, xi, key=xi.get)
-
-
-def get_priors(tokens):
-    counts = Counter(tokens)
-
-    freqs = {}
-    total = len(tokens)
-
-    for word in counts:
-        freqs[word] = counts[word] / total
-
-    return freqs
+    return logodds

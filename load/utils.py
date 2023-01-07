@@ -4,6 +4,7 @@ Pre-processing utils
 
 import networkx as nx
 import pandas as pd
+import dask.dataframe as dd
 
 from load.constants import DATA_DIR, COMMENT_DTYPES
 
@@ -61,9 +62,8 @@ def load_comments(
             compression="bz2",
             orient="records",
             lines=True,
-            dtype=False,
+            dtype=COMMENT_DTYPES,
             chunksize=1e4,
-            dtype=COMMENT_DTYPES
         ):
             comments_chunk_df = comments_chunk_df[
                 (comments_chunk_df.body != "[deleted]")
@@ -74,6 +74,32 @@ def load_comments(
     df_comments = pd.concat(comments, ignore_index=True)
 
     return df_comments
+
+
+def load_comments_dask(
+    year: int,
+    start_month: int = 1,
+    stop_month: int = 12,
+) -> dd.DataFrame:
+    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
+
+    comments_file_names = [
+        f"{comments_folder}/comments_{year}-{month:02}.bz2"
+        for month in range(start_month, stop_month + 1)
+    ]
+
+    comments = dd.read_json(
+        comments_file_names,
+        compression="bz2",
+        orient="records",
+        lines=True,
+        blocksize=None,  # 500e6 = 500MB
+        dtype=COMMENT_DTYPES,
+    )
+
+    # comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
+
+    return comments
 
 
 def load_users() -> pd.DataFrame:
@@ -99,6 +125,17 @@ def load_users() -> pd.DataFrame:
     return df_users
 
 
+def load_user_party(year: int) -> pd.DataFrame:
+    """Load user party affiliation
+
+    Returns:
+        pd.DataFrame: user-party dataframe
+    """
+    user_party = pd.read_json(f"{DATA_DIR}/output/user_party_{year}.json", lines=True)
+
+    return user_party
+
+
 def load_subreddits() -> pd.DataFrame:
     """Load all users
 
@@ -117,7 +154,7 @@ def load_subreddits() -> pd.DataFrame:
     return subreddits_df
 
 
-def load_txt_to_list(file_path: str) -> list(str):
+def load_txt_to_list(file_path: str) -> list[str]:
     with open(file_path, "r", encoding="utf-8") as file:
         data = file.read().splitlines()
 
