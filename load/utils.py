@@ -97,6 +97,8 @@ def load_comments_dask(
         dtype=COMMENT_DTYPES,
     )
 
+    comments = comments[comments["author"] != "[deleted]"]
+
     # comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
 
     return comments
@@ -136,6 +138,20 @@ def load_user_party(year: int) -> pd.DataFrame:
     return user_party
 
 
+def load_user_party_parquet(year: int) -> dd.DataFrame:
+    """Load user party affiliation
+
+    Returns:
+        dd.DataFrame: user-party dataframe
+    """
+    user_party = pd.read_parquet(
+        f"{DATA_DIR}/output/user_party_{year}.parquet",
+        columns=["author", "party"],
+    )
+
+    return user_party
+
+
 def load_subreddits() -> pd.DataFrame:
     """Load all users
 
@@ -161,6 +177,21 @@ def load_txt_to_list(file_path: str) -> list[str]:
         return data
 
 
-def save_df_as_json(data: pd.DataFrame, target_file: str):
-    folder = f"{DATA_DIR}/output"
-    data.to_json(f"{folder}/{target_file}", orient="records", lines=True)
+def save_df_as_json(data: pd.DataFrame | dd.DataFrame, target_file: str):
+    output_folder = f"{DATA_DIR}/output"
+    data.to_json(
+        f"{output_folder}/{target_file}",
+        orient="records",
+        lines=True,
+        index=False,
+    )
+
+
+def save_df_as_parquet(data: pd.DataFrame, target_file: str):
+    output_folder = f"{DATA_DIR}/output"
+    data.to_parquet(
+        f"{output_folder}/{target_file}",
+        engine="pyarrow",
+        compression="snappy",
+        index=False,
+    )

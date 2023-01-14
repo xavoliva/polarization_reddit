@@ -27,10 +27,44 @@ EVENTS_INFO = {
     },
 }
 
-ELECTIONS_REGEX = (
-    "vote|us|election|trump|hillary|president|candidate|democrat|republican|"
-    "donald|clinton|reps|dems|elect|ballot|crooked|swing"
-)
+ELECTIONS_KEYWORDS = [
+    "vote",
+    "us",
+    "usa",
+    "election",
+    "president",
+    "candidate",
+    "democrat",
+    "republican",
+    "reps",
+    "dems",
+    "elect",
+    "ballot",
+    "swing",
+]
+
+ELECTIONS_KEYWORDS_2008 = [
+    "barack",
+    "obama",
+    "john mccain",
+    "mccain",
+    "joe",
+    "biden",
+    "sarah palin",
+    "palin",
+]
+
+ELECTIONS_KEYWORDS_2016 = [
+    "donald",
+    "trump",
+    "hillary",
+    "clinton",
+]
+
+ELECTIONS_REGEX = {
+    2008: "|".join(ELECTIONS_KEYWORDS + ELECTIONS_KEYWORDS_2008),
+    2016: "|".join(ELECTIONS_KEYWORDS + ELECTIONS_KEYWORDS_2016),
+}
 
 EVENTS = EVENTS_INFO.keys()
 
