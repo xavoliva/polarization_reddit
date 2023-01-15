@@ -93,7 +93,7 @@ def load_comments_dask(
         compression="bz2",
         orient="records",
         lines=True,
-        blocksize=None,  # 500e6 = 500MB
+        # blocksize=None,  # 500e6 = 500MB
         dtype=COMMENT_DTYPES,
     )
 
@@ -158,16 +158,25 @@ def load_subreddits() -> pd.DataFrame:
     Returns:
         pd.DataFrame: user dataframe
     """
-    subreddits_df = pd.read_json(
+    subreddits = pd.read_json(
         f"{DATA_DIR}/metadata/subreddits_metadata.json",
         orient="records",
         lines=True,
+        dtype={
+            "subreddit": "string",
+            "banned": "bool",
+            "gun": "bool",
+            "meta": "bool",
+            "party": "string",
+            "politician": "bool",
+            "region": "string",
+        }
     )
 
     # Filter out regional and international subreddits
-    subreddits_df = subreddits_df[(subreddits_df["region"] == "")]
+    subreddits = subreddits[(subreddits["region"] == "")]
 
-    return subreddits_df
+    return subreddits
 
 
 def load_txt_to_list(file_path: str) -> list[str]:

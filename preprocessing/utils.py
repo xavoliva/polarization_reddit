@@ -103,7 +103,7 @@ def get_sentiment_score(comment: str) -> float:
 
 def calculate_user_party(user_comments) -> pd.Series:
     user_party = {}
-    
+
     dem_cnt = len(user_comments[user_comments["party"] == "dem"])
     rep_cnt = len(user_comments[user_comments["party"] == "rep"])
     score = dem_cnt - rep_cnt
