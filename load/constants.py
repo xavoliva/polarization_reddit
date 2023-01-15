@@ -2,7 +2,8 @@
 Load data constants
 """
 
-DATA_DIR = "/workspaces/polarization_reddit/data"
+# DATA_DIR = "/workspaces/polarization_reddit/data"
+DATA_DIR = "/home/xavi_oliva/Documents/Github/polarization_reddit/data"
 
 COMMENT_DTYPES = {
     "author": "string",

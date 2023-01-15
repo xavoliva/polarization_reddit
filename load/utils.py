@@ -97,7 +97,9 @@ def load_comments_dask(
         dtype=COMMENT_DTYPES,
     )
 
-    comments = comments[comments["author"] != "[deleted]"]
+    comments = comments[
+        (comments["author"] != "[deleted]") & (comments["body"] != "[deleted]")
+    ]
 
     # comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
 
@@ -170,7 +172,7 @@ def load_subreddits() -> pd.DataFrame:
             "party": "string",
             "politician": "bool",
             "region": "string",
-        }
+        },
     )
 
     # Filter out regional and international subreddits
