@@ -1,11 +1,13 @@
-from collections import Counter
+"""
+Polarization utils
+"""
 
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+from sklearn.feature_extraction.text import CountVectorizer
 
-from preprocessing.constants import EVENTS_DIR
-from preprocessing.utils import tokenize_comment, split_by_party
+from preprocessing.utils import split_by_party
 
 RNG = np.random.default_rng(42)
 
@@ -25,7 +27,7 @@ def get_rho(dem_q, rep_q):
     return (dem_q / (dem_q + rep_q)).transpose()
 
 
-def calculate_polarization(dem_user_token_cnt, rep_user_token_cnt):
+def calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt):
     dem_user_total = dem_user_token_cnt.sum(axis=1)
     rep_user_total = rep_user_token_cnt.sum(axis=1)
 
@@ -75,58 +77,34 @@ def calculate_polarization(dem_user_token_cnt, rep_user_token_cnt):
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def get_user_token_counts(posts, vocab):
-    users = posts.groupby("author")
-    row_idx = []
-    col_idx = []
-    data = []
-    for (
-        user_idx,
-        (_, user_group),
-    ) in enumerate(users):
-        word_indices = []
-        for post in user_group["body_cleaned"]:
-            count = 0
-            prev_w = ""
-            for w in tokenize_comment(post, stemmer=False):
-                if w == "":
-                    continue
-                if w in vocab:
-                    word_indices.append(vocab[w])
-                if count > 0:
-                    bigram = prev_w + " " + w
-                    if bigram in vocab:
-                        word_indices.append(vocab[bigram])
-                count += 1
-                prev_w = w
+def get_user_token_counts(comments, vocab: set):
+    user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
 
-        for word_idx, count in Counter(word_indices).items():
-            row_idx.append(user_idx)
-            col_idx.append(word_idx)
-            data.append(count)
+    vec = CountVectorizer(
+        analyzer="word", ngram_range=(1, 2), min_df=1, vocabulary=vocab
+    )
 
-    return sp.csr_matrix((data, (row_idx, col_idx)), shape=(len(users), len(vocab)))
+    user_matrix = vec.fit_transform(user_tokens)
+
+    print(user_matrix.shape)
+
+    return user_matrix
 
 
-def get_polarization(event, comments, default_score=0.5):
+def get_polarization(
+    comments: pd.DataFrame,
+    vocab: dict[str, int],
+    default_score: int = 0.5,
+    method: str = "leaveout",
+):
     """
     Measure polarization.
     event: name of the event
-    data: dataframe with 'body_cleaned' and 'user'
+    comments: dataframe with 'body_cleaned' and 'user'
     default_score: default token partisanship score
     """
-    # get partisan posts
+    # get partisan comments
     dem_comments, rep_comments = split_by_party(comments)
-
-    # get vocab
-    vocab = {
-        w: i
-        for i, w in enumerate(
-            open(f"{EVENTS_DIR}/{event}_tokens.txt", "r", encoding="utf-8")
-            .read()
-            .splitlines()
-        )
-    }
 
     dem_user_token_cnt = get_user_token_counts(dem_comments, vocab)
     rep_user_token_cnt = get_user_token_counts(rep_comments, vocab)
@@ -178,50 +156,51 @@ def get_polarization(event, comments, default_score=0.5):
     rep_user_token_cnt = rep_user_token_cnt[
         np.array([(i in rep_nonzero) for i in range(rep_user_token_cnt.shape[0])]), :
     ]
+    if method == "leaveout":
+        (
+            total_polarization,
+            dem_user_polarizations,
+            rep_user_polarizations,
+        ) = calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt)
 
-    (
-        total_polarization,
-        dem_user_polarizations,
-        rep_user_polarizations,
-    ) = calculate_polarization(dem_user_token_cnt, rep_user_token_cnt)
+        all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
+        index = np.arange(all_counts.shape[0])
+        RNG.shuffle(index)
+        shuffled_all_counts = all_counts[index, :]
 
-    all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
-    index = np.arange(all_counts.shape[0])
-    RNG.shuffle(index)
-    shuffled_all_counts = all_counts[index, :]
+        # Calculate polarization with random assignment of users
+        random_polarization, _, _ = calculate_leaveout_polarization(
+            shuffled_all_counts[: dem_user_token_cnt.shape[0], :],
+            shuffled_all_counts[dem_user_token_cnt.shape[0] :, :],
+        )
 
-    # Calculate polarization with random assignment of users
-    random_polarization, _, _ = calculate_polarization(
-        shuffled_all_counts[: dem_user_token_cnt.shape[0], :],
-        shuffled_all_counts[dem_user_token_cnt.shape[0] :, :],
-    )
+        user_cnt = dem_user_cnt + rep_user_cnt
 
-    user_cnt = dem_user_cnt + rep_user_cnt
-
-    return (total_polarization, random_polarization, user_cnt), (
-        dem_user_polarizations,
-        rep_user_polarizations,
-    )
-
-
-def split_by_day(data):
-    return [(v, k) for k, v in data.groupby("date")]
+        return (total_polarization, random_polarization, user_cnt), (
+            dem_user_polarizations,
+            rep_user_polarizations,
+        )
 
 
-def split_by_week(data):
-    return [(v, k) for k, v in data.groupby(pd.Grouper(key="date", freq="W"))]
+def split_by_day(comments):
+    return [(v, k) for k, v in comments.groupby("date")]
 
 
-def get_polarization_by_time(event, data, freq="day"):
+def split_by_week(comments):
+    return [(v, k) for k, v in comments.groupby(pd.Grouper(key="date", freq="W"))]
+
+
+def get_polarization_by_time(event_comments, event_vocab, freq="day"):
     if freq == "day":
-        data_time = split_by_day(data)
+        comments_time = split_by_day(event_comments)
     elif freq == "week":
-        data_time = split_by_week(data)
+        comments_time = split_by_week(event_comments)
 
     polarization = []
-    for date_data, date in data_time:
+    for date_comments, date in comments_time:
         (total_polarization, random_polarization, user_cnt), _ = get_polarization(
-            event, date_data
+            date_comments,
+            event_vocab,
         )
         polarization.append(
             (total_polarization, random_polarization, user_cnt, pd.to_datetime(date))

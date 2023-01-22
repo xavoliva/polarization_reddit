@@ -1,36 +1,35 @@
-import math
-from collections import defaultdict
+import numpy as np
 
 
 def logodds_with_prior(
-    vocab: dict[str, int],
-    dem_vocab: dict[str, int],
-    rep_vocab: dict[str, int],
+    term_vec,
+    dem_term_vec,
+    rep_term_vec,
 ) -> dict[str, float]:
     """
     Weighted log odds ratio, as defined in
     https://bookdown.org/Maxine/tidy-text-mining/weighted-log-odds-ratio.html
     """
+    term_vec = term_vec.toarray()[0]
+    dem_term_vec = dem_term_vec.toarray()[0]
+    rep_term_vec = rep_term_vec.toarray()[0]
 
-    nr_tokens = sum(vocab.values())
-    nr_dem_tokens = sum(dem_vocab.values())
-    nr_rep_tokens = sum(rep_vocab.values())
+    nr_tokens = np.sum(term_vec)
+    nr_dem_tokens = np.sum(dem_term_vec)
+    nr_rep_tokens = np.sum(rep_term_vec)
 
-    logodds = defaultdict(float)
+    dem_numerator = dem_term_vec + term_vec
+    dem_denominator = nr_dem_tokens + nr_tokens - dem_numerator
 
-    for word in vocab.keys():
-        dem_numerator = dem_vocab[word] + vocab[word]
-        dem_denominator = nr_dem_tokens + nr_tokens - dem_numerator
+    rep_numerator = rep_term_vec + term_vec
+    rep_denominator = nr_rep_tokens + nr_tokens - rep_numerator
 
-        rep_numerator = rep_vocab[word] + vocab[word]
-        rep_denominator = nr_rep_tokens + nr_tokens - rep_numerator
-
-        raw_logodds = math.log(dem_numerator / dem_denominator) - math.log(
+    raw_logodds = np.log(dem_numerator / dem_denominator) - np.log(
         rep_numerator / rep_denominator
-        )
+    )
 
-        variance = (1 / dem_numerator) + (1 / rep_numerator)
+    variance = 1 / dem_numerator + 1 / rep_numerator
 
-        logodds[word] = raw_logodds / math.sqrt(variance)
+    logodds = raw_logodds / np.sqrt(variance)
 
     return logodds

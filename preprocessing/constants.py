@@ -9,6 +9,10 @@ EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
 
 EVENTS_INFO = {
+    "us_elections_2008": {
+        "name": "2008 US presidential election",
+        "date": pd.to_datetime("11-04-2008"),
+    },
     "us_elections_2012": {
         "name": "2012 US presidential election",
         "date": pd.to_datetime("11-06-2012"),

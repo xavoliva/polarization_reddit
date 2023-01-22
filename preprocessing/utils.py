@@ -6,7 +6,7 @@ import json
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
 import pandas as pd
-import dask.dataframe as dd
+from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -15,14 +15,17 @@ from preprocessing.constants import (
 )
 
 
-sno = LancasterStemmer()  # ("english")
+sno = LancasterStemmer()
 
 
-def split_by_party(data):
+def split_by_party(comments):
     """
     split dataframe by party
     """
-    return data[data["party"] == "dem"], data[data["party"] == "rep"]
+    return (
+        comments[comments["party"] == "dem"],
+        comments[comments["party"] == "rep"],
+    )
 
 
 def tokenize_comment(comment: str, stemmer: bool = True) -> str:
@@ -45,9 +48,7 @@ def tokenize_comment(comment: str, stemmer: bool = True) -> str:
     return " ".join(tokens)
 
 
-def load_event_comments(
-    event_name: str, file_type: str = "parquet"
-) -> (pd.DataFrame | dd.DataFrame):
+def load_event_comments(event_name: str, file_type: str = "parquet") -> pd.DataFrame:
     """
     Load dataframe from event
     """
@@ -59,8 +60,8 @@ def load_event_comments(
             usecols=["author", "body_cleaned", "created_utc", "party"],
         )
     elif file_type == "parquet":
-        event_comments = dd.read_parquet(
-            comments_file,
+        event_comments = pd.read_parquet(
+            f"{comments_file}.parquet",
             engine="pyarrow",
         )
     else:
@@ -69,7 +70,9 @@ def load_event_comments(
     return event_comments
 
 
-def save_event_comments(event_comments, event_name: str, file_type: str = "parquet"):
+def save_event_comments(
+    event_comments: pd.DataFrame, event_name: str, file_type: str = "parquet"
+):
     """
     Save event dataframe
     """
@@ -90,8 +93,13 @@ def save_event_comments(event_comments, event_name: str, file_type: str = "parqu
 
 
 def save_event_vocab(event_vocab: dict[str, int], event_name: str):
-    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "w", encoding="utf-8") as fp:
-        json.dump(event_vocab, fp)
+    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "w", encoding="utf-8") as file:
+        json.dump(event_vocab, file)
+
+
+def load_event_vocab(event_name: str):
+    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def get_sentiment_score(comment: str) -> float:
@@ -123,6 +131,20 @@ def calculate_user_party(user_comments) -> pd.Series:
 
 
 def build_vocab(corpus: pd.Series, min_words: int) -> dict[str, int]:
-    vec = CountVectorizer(analyzer="word", ngram_range=(1, 2), min_df=min_words)
-    vec.fit_transform(corpus)
+    vec = CountVectorizer(
+        analyzer="word",
+        ngram_range=(1, 2),
+        min_df=min_words,
+    )
+    vec.fit(corpus)
     return vec.vocabulary_
+
+
+def build_term_vector(corpus: pd.Series, vocabulary) -> csr_matrix:
+    vec = CountVectorizer(
+        analyzer="word",
+        ngram_range=(1, 2),
+        vocabulary=vocabulary,
+    )
+    doc_term_vec = vec.transform([corpus.str.cat(sep=" ")])
+    return doc_term_vec
