@@ -18,7 +18,7 @@ from preprocessing.constants import (
 sno = LancasterStemmer()
 
 
-def split_by_party(comments):
+def split_by_party(comments) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     split dataframe by party
     """

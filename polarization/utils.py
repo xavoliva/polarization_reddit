@@ -77,21 +77,19 @@ def calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt):
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def get_user_token_counts(comments, vocab: set):
+def build_user_term_vector(comments, vocab: dict[str, int]):
     user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
 
     vec = CountVectorizer(
         analyzer="word", ngram_range=(1, 2), min_df=1, vocabulary=vocab
     )
 
-    user_matrix = vec.fit_transform(user_tokens)
-
-    print(user_matrix.shape)
+    user_matrix = vec.transform(user_tokens["tokens"])
 
     return user_matrix
 
 
-def get_polarization(
+def calculate_polarization(
     comments: pd.DataFrame,
     vocab: dict[str, int],
     default_score: int = 0.5,
@@ -106,75 +104,75 @@ def get_polarization(
     # get partisan comments
     dem_comments, rep_comments = split_by_party(comments)
 
-    dem_user_token_cnt = get_user_token_counts(dem_comments, vocab)
-    rep_user_token_cnt = get_user_token_counts(rep_comments, vocab)
+    dem_user_term_vec = build_user_term_vector(dem_comments, vocab)
+    rep_user_term_vec = build_user_term_vector(rep_comments, vocab)
 
-    dem_user_cnt = dem_user_token_cnt.shape[0]
-    rep_user_cnt = rep_user_token_cnt.shape[0]
+    dem_user_cnt = dem_user_term_vec.shape[0]
+    rep_user_cnt = rep_user_term_vec.shape[0]
 
     if dem_user_cnt < 10 or rep_user_cnt < 10:
         # return these values when there is not enough data to make predictions on
-        return (default_score, default_score, dem_user_cnt + rep_user_cnt), ([], [])
+        return (
+            (default_score, default_score, dem_user_cnt + rep_user_cnt),
+            ([], []),
+        )
 
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:
-        dem_user_sample = np.array(RNG.sample(range(dem_user_cnt), rep_user_cnt))
-        dem_user_token_cnt = dem_user_token_cnt[dem_user_sample, :]
-        dem_user_cnt = dem_user_token_cnt.shape[0]
+        dem_user_sample_ind = np.array(RNG.sample(range(dem_user_cnt), rep_user_cnt))
+        dem_user_token_cnt = dem_user_token_cnt[dem_user_sample_ind]
+
     elif rep_user_cnt > dem_user_cnt:
-        rep_user_sample = np.array(RNG.sample(range(rep_user_cnt), dem_user_cnt))
-        rep_user_token_cnt = rep_user_token_cnt[rep_user_sample, :]
-        rep_user_cnt = rep_user_token_cnt.shape[0]
+        rep_user_sample_ind = np.array(RNG.sample(range(rep_user_cnt), dem_user_cnt))
+        rep_user_token_cnt = rep_user_token_cnt[rep_user_sample_ind]
 
-    assert dem_user_cnt == rep_user_cnt
+    assert dem_user_token_cnt.shape[0] == rep_user_token_cnt.shape[0]
 
-    all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
+    user_cnt = dem_user_token_cnt.shape[0] + rep_user_token_cnt.shape[0]
 
-    wordcounts = all_counts.nonzero()[1]
+    user_token_cnt = np.vstack((dem_user_token_cnt, rep_user_token_cnt))
+
+    nr_users_word = user_token_cnt.count_nonzero(axis=0)
 
     # filter words used by fewer than 2 people
-    all_counts = all_counts[
+    user_token_cnt = user_token_cnt[
         :,
-        np.array(
-            [
-                (np.count_nonzero(wordcounts == i) > 1)
-                for i in range(all_counts.shape[1])
-            ]
-        ),
+        nr_users_word > 1,
     ]
 
-    dem_user_token_cnt = all_counts[:dem_user_cnt, :]
-    rep_user_token_cnt = all_counts[dem_user_cnt:, :]
+    dem_user_token_cnt = user_token_cnt[:dem_user_cnt]
+    rep_user_token_cnt = user_token_cnt[dem_user_cnt:]
 
     dem_nonzero = set(dem_user_token_cnt.nonzero()[0])
     rep_nonzero = set(rep_user_token_cnt.nonzero()[0])
 
     # filter users who did not use words from vocab
     dem_user_token_cnt = dem_user_token_cnt[
-        np.array([(i in dem_nonzero) for i in range(dem_user_token_cnt.shape[0])]), :
+        np.array([(i in dem_nonzero) for i in range(dem_user_token_cnt.shape[0])])
     ]
     rep_user_token_cnt = rep_user_token_cnt[
-        np.array([(i in rep_nonzero) for i in range(rep_user_token_cnt.shape[0])]), :
+        np.array([(i in rep_nonzero) for i in range(rep_user_token_cnt.shape[0])])
     ]
     if method == "leaveout":
         (
             total_polarization,
             dem_user_polarizations,
             rep_user_polarizations,
-        ) = calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt)
+        ) = calculate_leaveout_polarization(
+            dem_user_token_cnt,
+            rep_user_token_cnt,
+        )
 
-        all_counts = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
-        index = np.arange(all_counts.shape[0])
+        user_token_cnt = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
+        index = np.arange(user_token_cnt.shape[0])
         RNG.shuffle(index)
-        shuffled_all_counts = all_counts[index, :]
+        shuffled_user_token_cnt = user_token_cnt[index]
 
         # Calculate polarization with random assignment of users
         random_polarization, _, _ = calculate_leaveout_polarization(
-            shuffled_all_counts[: dem_user_token_cnt.shape[0], :],
-            shuffled_all_counts[dem_user_token_cnt.shape[0] :, :],
+            shuffled_user_token_cnt[: dem_user_token_cnt.shape[0]],
+            shuffled_user_token_cnt[dem_user_token_cnt.shape[0] :],
         )
-
-        user_cnt = dem_user_cnt + rep_user_cnt
 
         return (total_polarization, random_polarization, user_cnt), (
             dem_user_polarizations,
@@ -190,7 +188,7 @@ def split_by_week(comments):
     return [(v, k) for k, v in comments.groupby(pd.Grouper(key="date", freq="W"))]
 
 
-def get_polarization_by_time(event_comments, event_vocab, freq="day"):
+def calculate_polarization_by_time(event_comments, event_vocab, freq="day"):
     if freq == "day":
         comments_time = split_by_day(event_comments)
     elif freq == "week":
@@ -198,15 +196,25 @@ def get_polarization_by_time(event_comments, event_vocab, freq="day"):
 
     polarization = []
     for date_comments, date in comments_time:
-        (total_polarization, random_polarization, user_cnt), _ = get_polarization(
+        (total_polarization, random_polarization, user_cnt), _ = calculate_polarization(
             date_comments,
             event_vocab,
         )
         polarization.append(
-            (total_polarization, random_polarization, user_cnt, pd.to_datetime(date))
+            (
+                total_polarization,
+                random_polarization,
+                user_cnt,
+                pd.to_datetime(date),
+            )
         )
 
     return pd.DataFrame(
         polarization,
-        columns=["polarization", "random_polarization", "user_cnt", "date"],
+        columns=[
+            "polarization",
+            "random_polarization",
+            "user_cnt",
+            "date",
+        ],
     )
