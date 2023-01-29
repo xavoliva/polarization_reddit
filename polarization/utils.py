@@ -12,59 +12,71 @@ from preprocessing.utils import split_by_party
 RNG = np.random.default_rng(42)
 
 
-def get_party_q(party_counts, exclude_user=None):
-    user_sum = party_counts.sum(axis=0)
+def get_party_q(user_term_matrix: sp.csr_matrix, excluded_user=None) -> np.ndarray:
+    if excluded_user:
+        user_term_matrix[excluded_user] = 0
 
-    if exclude_user:
-        user_sum -= party_counts[exclude_user, :]
+    term_cnt = user_term_matrix.sum(axis=0).A1
 
-    total_sum = user_sum.sum()
+    total_token_cnt = user_term_matrix.sum()
 
-    return user_sum / total_sum
-
-
-def get_rho(dem_q, rep_q):
-    return (dem_q / (dem_q + rep_q)).transpose()
+    return term_cnt / total_token_cnt
 
 
-def calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt):
-    dem_user_total = dem_user_token_cnt.sum(axis=1)
-    rep_user_total = rep_user_token_cnt.sum(axis=1)
+def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
+    assert np.all((dem_q + rep_q) > 0)
+    return dem_q / (dem_q + rep_q)
+
+
+def calculate_leaveout_polarization(
+    dem_user_term_matrix: sp.csr_matrix,
+    rep_user_term_matrix: sp.csr_matrix,
+):
+    dem_user_term_cnt = dem_user_term_matrix.sum(axis=1).A1
+    rep_user_term_cnt = rep_user_term_matrix.sum(axis=1).A1
+
+    # make sure there are no zero rows
+    assert np.all(dem_user_term_cnt > 0)
+    # make sure there are no zero rows
+    assert np.all(rep_user_term_cnt > 0)
 
     # get row-wise distributions
-    dem_user_distr = (sp.diags(1 / dem_user_total.A.ravel())).dot(dem_user_token_cnt)
-    rep_user_distr = (sp.diags(1 / rep_user_total.A.ravel())).dot(rep_user_token_cnt)
+    dem_user_term_freq_matrix = sp.diags(1 / dem_user_term_cnt) @ dem_user_term_matrix
+    rep_user_term_freq_matrix = sp.diags(1 / rep_user_term_cnt) @ rep_user_term_matrix
 
-    nr_dem_users = dem_user_token_cnt.shape[0]
-    nr_rep_users = rep_user_token_cnt.shape[0]
+    nr_dem_users = dem_user_term_matrix.shape[0]
+    nr_rep_users = rep_user_term_matrix.shape[0]
 
-    # make sure there are no zero rows
-    assert set(dem_user_total.nonzero()[0]) == set(range(nr_dem_users))
-    # make sure there are no zero rows
-    assert set(rep_user_total.nonzero()[0]) == set(range(nr_rep_users))
+    dem_q = get_party_q(dem_user_term_matrix)
+    rep_q = get_party_q(rep_user_term_matrix)
 
-    dem_q = get_party_q(dem_user_token_cnt)
-    rep_q = get_party_q(rep_user_token_cnt)
-
+    # Republican polarization
     dem_user_polarizations = []
-    rep_user_polarizations = []
-
     dem_polarization_sum = 0
+
     for i in range(nr_dem_users):
-        dem_leaveout_q = get_party_q(dem_user_token_cnt, i)
+        dem_leaveout_q = get_party_q(dem_user_term_matrix, i)
         dem_token_scores = get_rho(dem_leaveout_q, rep_q)
 
-        dem_user_polarization = dem_user_distr[i, :].dot(dem_token_scores)[0, 0]
+        dem_user_term_freq_vec = dem_user_term_freq_matrix[i].todense().A1
+
+        dem_user_polarization = dem_user_term_freq_vec.dot(dem_token_scores)
+
         dem_user_polarizations.append(dem_user_polarization)
 
         dem_polarization_sum += dem_user_polarization
 
+    # Republican polarization
+    rep_user_polarizations = []
     rep_polarization_sum = 0
+
     for i in range(nr_rep_users):
-        rep_leaveout_q = get_party_q(rep_user_token_cnt, i)
+        rep_leaveout_q = get_party_q(rep_user_term_matrix, i)
         rep_token_scores = 1.0 - get_rho(dem_q, rep_leaveout_q)
 
-        rep_user_polarization = rep_user_distr[i, :].dot(rep_token_scores)[0, 0]
+        rep_user_term_freq_vec = rep_user_term_freq_matrix[i].todense().A1
+
+        rep_user_polarization = rep_user_term_freq_vec.dot(rep_token_scores)
         rep_user_polarizations.append(rep_user_polarization)
 
         rep_polarization_sum += rep_user_polarization
@@ -72,12 +84,12 @@ def calculate_leaveout_polarization(dem_user_token_cnt, rep_user_token_cnt):
     dem_total_polarization = 1 / nr_dem_users * dem_polarization_sum
     rep_total_polarization = 1 / nr_rep_users * rep_polarization_sum
 
-    total_pol = 1 / 2 * (dem_total_polarization + rep_total_polarization)
+    total_pol = 0.5 * (dem_total_polarization + rep_total_polarization)
 
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def build_user_term_vector(comments, vocab: dict[str, int]):
+def build_user_term_matrix(comments, vocab: dict[str, int]):
     user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
 
     vec = CountVectorizer(
@@ -104,74 +116,57 @@ def calculate_polarization(
     # get partisan comments
     dem_comments, rep_comments = split_by_party(comments)
 
-    dem_user_term_vec = build_user_term_vector(dem_comments, vocab)
-    rep_user_term_vec = build_user_term_vector(rep_comments, vocab)
+    dem_user_term_matrix = build_user_term_matrix(dem_comments, vocab)
+    rep_user_term_matrix = build_user_term_matrix(rep_comments, vocab)
 
-    dem_user_cnt = dem_user_term_vec.shape[0]
-    rep_user_cnt = rep_user_term_vec.shape[0]
+    # filter out users who did not use words from vocab
+    dem_user_term_matrix = dem_user_term_matrix[dem_user_term_matrix.getnnz(axis=1) > 0]
+    rep_user_term_matrix = rep_user_term_matrix[rep_user_term_matrix.getnnz(axis=1) > 0]
+
+    dem_user_cnt = dem_user_term_matrix.shape[0]
+    rep_user_cnt = rep_user_term_matrix.shape[0]
 
     if dem_user_cnt < 10 or rep_user_cnt < 10:
         # return these values when there is not enough data to make predictions on
-        return (
-            (default_score, default_score, dem_user_cnt + rep_user_cnt),
-            ([], []),
+        raise RuntimeError(
+            f"""Not enough data to make predictions:
+            - Number of democrat users: {dem_user_cnt}
+            - Number of republican users: {rep_user_cnt}
+            """
         )
 
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:
-        dem_user_sample_ind = np.array(RNG.sample(range(dem_user_cnt), rep_user_cnt))
-        dem_user_token_cnt = dem_user_token_cnt[dem_user_sample_ind]
+        random_ind = RNG.choice(dem_user_cnt, size=rep_user_cnt)
+        dem_user_term_matrix = dem_user_term_matrix[random_ind]
 
     elif rep_user_cnt > dem_user_cnt:
-        rep_user_sample_ind = np.array(RNG.sample(range(rep_user_cnt), dem_user_cnt))
-        rep_user_token_cnt = rep_user_token_cnt[rep_user_sample_ind]
+        random_ind = RNG.choice(rep_user_cnt, size=dem_user_cnt)
+        rep_user_term_matrix = rep_user_term_matrix[random_ind]
 
-    assert dem_user_token_cnt.shape[0] == rep_user_token_cnt.shape[0]
+    assert dem_user_term_matrix.shape[0] == rep_user_term_matrix.shape[0]
 
-    user_cnt = dem_user_token_cnt.shape[0] + rep_user_token_cnt.shape[0]
+    user_cnt = dem_user_term_matrix.shape[0] + rep_user_term_matrix.shape[0]
 
-    user_token_cnt = np.vstack((dem_user_token_cnt, rep_user_token_cnt))
-
-    nr_users_word = user_token_cnt.count_nonzero(axis=0)
-
-    # filter words used by fewer than 2 people
-    user_token_cnt = user_token_cnt[
-        :,
-        nr_users_word > 1,
-    ]
-
-    dem_user_token_cnt = user_token_cnt[:dem_user_cnt]
-    rep_user_token_cnt = user_token_cnt[dem_user_cnt:]
-
-    dem_nonzero = set(dem_user_token_cnt.nonzero()[0])
-    rep_nonzero = set(rep_user_token_cnt.nonzero()[0])
-
-    # filter users who did not use words from vocab
-    dem_user_token_cnt = dem_user_token_cnt[
-        np.array([(i in dem_nonzero) for i in range(dem_user_token_cnt.shape[0])])
-    ]
-    rep_user_token_cnt = rep_user_token_cnt[
-        np.array([(i in rep_nonzero) for i in range(rep_user_token_cnt.shape[0])])
-    ]
     if method == "leaveout":
         (
             total_polarization,
             dem_user_polarizations,
             rep_user_polarizations,
         ) = calculate_leaveout_polarization(
-            dem_user_token_cnt,
-            rep_user_token_cnt,
+            dem_user_term_matrix,
+            rep_user_term_matrix,
         )
 
-        user_token_cnt = sp.vstack([dem_user_token_cnt, rep_user_token_cnt])
-        index = np.arange(user_token_cnt.shape[0])
-        RNG.shuffle(index)
-        shuffled_user_token_cnt = user_token_cnt[index]
-
         # Calculate polarization with random assignment of users
+        user_token_cnt = sp.vstack((dem_user_term_matrix, rep_user_term_matrix))
+
+        shuffled_ind = np.arange(user_cnt)
+        shuffled_user_token_cnt = user_token_cnt[shuffled_ind]
+
         random_polarization, _, _ = calculate_leaveout_polarization(
-            shuffled_user_token_cnt[: dem_user_token_cnt.shape[0]],
-            shuffled_user_token_cnt[dem_user_token_cnt.shape[0] :],
+            shuffled_user_token_cnt[: int(user_cnt / 2)],
+            shuffled_user_token_cnt[int(user_cnt / 2) :],
         )
 
         return (total_polarization, random_polarization, user_cnt), (
