@@ -24,7 +24,11 @@ def get_party_q(user_term_matrix: sp.csr_matrix, excluded_user=None) -> np.ndarr
 
 
 def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
-    assert np.all((dem_q + rep_q) > 0)
+
+    assert (
+        np.count_nonzero(dem_q + rep_q) < 1
+    ), f"{np.count_nonzero(dem_q)}, {np.count_nonzero(rep_q)}"
+
     return dem_q / (dem_q + rep_q)
 
 
@@ -148,6 +152,17 @@ def calculate_polarization(
 
     user_cnt = dem_user_term_matrix.shape[0] + rep_user_term_matrix.shape[0]
 
+    user_term_matrix = sp.vstack(
+        (
+            dem_user_term_matrix,
+            rep_user_term_matrix,
+        )
+    )
+
+    # filter out words used by fewer than 2 people
+    # dem_user_term_matrix = dem_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
+    # rep_user_term_matrix = rep_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
+
     if method == "leaveout":
         (
             total_polarization,
@@ -159,10 +174,9 @@ def calculate_polarization(
         )
 
         # Calculate polarization with random assignment of users
-        user_token_cnt = sp.vstack((dem_user_term_matrix, rep_user_term_matrix))
 
         shuffled_ind = np.arange(user_cnt)
-        shuffled_user_token_cnt = user_token_cnt[shuffled_ind]
+        shuffled_user_token_cnt = user_term_matrix[shuffled_ind]
 
         random_polarization, _, _ = calculate_leaveout_polarization(
             shuffled_user_token_cnt[: int(user_cnt / 2)],
