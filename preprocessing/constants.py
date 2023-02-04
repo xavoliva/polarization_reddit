@@ -40,8 +40,8 @@ ELECTIONS_KEYWORDS = [
     "candidate",
     "democrat",
     "republican",
-    "reps",
-    "dems",
+    "rep",
+    "dem",
     "elect",
     "ballot",
     "swing",
@@ -58,6 +58,15 @@ ELECTIONS_KEYWORDS_2008 = [
     "palin",
 ]
 
+ELECTIONS_KEYWORDS_2012 = [
+    "barack",
+    "obama",
+    "mitt romney",
+    "romney",
+    "paul ryan",
+    "ryan",
+]
+
 ELECTIONS_KEYWORDS_2016 = [
     "donald",
     "trump",
@@ -65,8 +74,10 @@ ELECTIONS_KEYWORDS_2016 = [
     "clinton",
 ]
 
+
 ELECTIONS_REGEX = {
     2008: "|".join(ELECTIONS_KEYWORDS + ELECTIONS_KEYWORDS_2008),
+    2012: "|".join(ELECTIONS_KEYWORDS + ELECTIONS_KEYWORDS_2012),
     2016: "|".join(ELECTIONS_KEYWORDS + ELECTIONS_KEYWORDS_2016),
 }
 
