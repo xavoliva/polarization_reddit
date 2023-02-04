@@ -5,8 +5,9 @@ Pre-processing utils
 import networkx as nx
 import pandas as pd
 import dask.dataframe as dd
+from tqdm import tqdm
 
-from load.constants import DATA_DIR, COMMENT_DTYPES
+from load.constants import DATA_DIR, COMMENT_DTYPES, COMMENT_COLUMNS
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -55,7 +56,7 @@ def load_comments(
     comments_folder = f"{DATA_DIR}/comments/comments_{year}"
     comments = []
     # Load comments in chunks
-    for month in range(start_month, stop_month + 1):
+    for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
         comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.bz2"
         for comments_chunk_df in pd.read_json(
             comments_file_name,
@@ -68,7 +69,8 @@ def load_comments(
             comments_chunk_df = comments_chunk_df[
                 (comments_chunk_df.body != "[deleted]")
                 & (comments_chunk_df.author != "[deleted]")
-            ]
+                & (comments_chunk_df.language == "en")
+            ][COMMENT_COLUMNS]
             comments.append(comments_chunk_df)
 
     df_comments = pd.concat(comments, ignore_index=True)
@@ -98,10 +100,10 @@ def load_comments_dask(
     )
 
     comments = comments[
-        (comments["author"] != "[deleted]") & (comments["body"] != "[deleted]")
-    ]
-
-    # comments["date"] = dd.to_datetime(comments["created_utc"], unit="s").dt.date
+        (comments["author"] != "[deleted]")
+        & (comments["body"] != "[deleted]")
+        & (comments["language"] == "en")
+    ][COMMENT_COLUMNS]
 
     return comments
 

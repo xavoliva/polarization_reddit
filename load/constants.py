@@ -31,7 +31,6 @@ COMMENT_COLUMNS = [
     "body_cleaned",
     "created_utc",
     "subreddit",
-    "subreddit_id",
 ]
 
 ALL_USER_COLUMNS = [
