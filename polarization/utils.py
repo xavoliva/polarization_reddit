@@ -1,7 +1,7 @@
 """
 Polarization utils
 """
-
+import warnings
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -25,11 +25,16 @@ def get_party_q(user_term_matrix: sp.csr_matrix, excluded_user=None) -> np.ndarr
 
 def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
 
-    assert (
-        np.count_nonzero(dem_q + rep_q) < 1
-    ), f"{np.count_nonzero(dem_q)}, {np.count_nonzero(rep_q)}"
+    denom = dem_q + rep_q
 
-    return dem_q / (dem_q + rep_q)
+    nr_zero_values_denominator = np.count_nonzero(denom == 0)
+
+    if nr_zero_values_denominator > 5:
+        warnings.warn(
+            f"A lot of values in the denominator are zero: {nr_zero_values_denominator}"
+        )
+
+    return np.divide(dem_q, denom, out=np.zeros_like(dem_q), where=dem_q + rep_q != 0)
 
 
 def calculate_leaveout_polarization(
@@ -40,9 +45,13 @@ def calculate_leaveout_polarization(
     rep_user_term_cnt = rep_user_term_matrix.sum(axis=1).A1
 
     # make sure there are no zero rows
-    assert np.all(dem_user_term_cnt > 0)
+    assert (
+        np.count_nonzero(dem_user_term_cnt == 0) == 0
+    ), f"{np.count_nonzero(dem_user_term_cnt == 0)} dem users without words!"
     # make sure there are no zero rows
-    assert np.all(rep_user_term_cnt > 0)
+    assert (
+        np.count_nonzero(rep_user_term_cnt == 0) == 0
+    ), f"{np.count_nonzero(rep_user_term_cnt == 0)} rep users without words!"
 
     # get row-wise distributions
     dem_user_term_freq_matrix = sp.diags(1 / dem_user_term_cnt) @ dem_user_term_matrix
@@ -108,7 +117,6 @@ def build_user_term_matrix(comments, vocab: dict[str, int]):
 def calculate_polarization(
     comments: pd.DataFrame,
     vocab: dict[str, int],
-    default_score: int = 0.5,
     method: str = "leaveout",
 ):
     """
@@ -160,8 +168,8 @@ def calculate_polarization(
     )
 
     # filter out words used by fewer than 2 people
-    # dem_user_term_matrix = dem_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
-    # rep_user_term_matrix = rep_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
+    dem_user_term_matrix = dem_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
+    rep_user_term_matrix = rep_user_term_matrix[:, user_term_matrix.getnnz(axis=0) > 1]
 
     if method == "leaveout":
         (
