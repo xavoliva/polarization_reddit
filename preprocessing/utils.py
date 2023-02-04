@@ -130,11 +130,11 @@ def calculate_user_party(user_comments) -> pd.Series:
     return pd.Series(user_party)
 
 
-def build_vocab(corpus: pd.Series, min_words: int) -> dict[str, int]:
+def build_vocab(corpus: pd.Series, min_comment_freq: int) -> dict[str, int]:
     vec = CountVectorizer(
         analyzer="word",
         ngram_range=(1, 2),
-        min_df=min_words,
+        min_df=min_comment_freq,
     )
     vec.fit(corpus)
     return vec.vocabulary_
