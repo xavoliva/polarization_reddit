@@ -2,6 +2,7 @@
 Polarization utils
 """
 # import warnings
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -101,7 +102,7 @@ def calculate_leaveout_polarization(
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def build_user_term_matrix(comments, vocab: dict[str, int]):
+def build_user_term_matrix(comments, vocab: Dict[str, int]):
     user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
 
     vec = CountVectorizer(
@@ -115,7 +116,7 @@ def build_user_term_matrix(comments, vocab: dict[str, int]):
 
 def calculate_polarization(
     comments: pd.DataFrame,
-    vocab: dict[str, int],
+    vocab: Dict[str, int],
     method: str = "leaveout",
 ):
     """

@@ -2,6 +2,7 @@
 Pre-processing utils
 """
 import json
+from typing import Dict, Tuple
 
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
@@ -18,7 +19,7 @@ from preprocessing.constants import (
 sno = LancasterStemmer()
 
 
-def split_by_party(comments) -> tuple[pd.DataFrame, pd.DataFrame]:
+def split_by_party(comments) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     split dataframe by party
     """
@@ -92,7 +93,7 @@ def save_event_comments(
         raise NotImplementedError(f"File type {file_type} not allowed.")
 
 
-def save_event_vocab(event_vocab: dict[str, int], event_name: str):
+def save_event_vocab(event_vocab: Dict[str, int], event_name: str):
     with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "w", encoding="utf-8") as file:
         json.dump(event_vocab, file)
 
@@ -130,7 +131,7 @@ def calculate_user_party(user_comments) -> pd.Series:
     return pd.Series(user_party)
 
 
-def build_vocab(corpus: pd.Series, min_comment_freq: int) -> dict[str, int]:
+def build_vocab(corpus: pd.Series, min_comment_freq: int) -> Dict[str, int]:
     vec = CountVectorizer(
         analyzer="word",
         ngram_range=(1, 2),

@@ -2,6 +2,8 @@
 Pre-processing utils
 """
 
+from typing import List, Union
+
 import networkx as nx
 import pandas as pd
 import dask.dataframe as dd
@@ -48,7 +50,8 @@ def load_comments(
 
     Args:
         year (int): year
-        months (list[int], optional): Range of months to load. Defaults to None.
+        start_month (int): start month
+        stop_month (int): stop month (included)
 
     Returns:
         pd.DataFrame: comments pandas dataframe
@@ -183,14 +186,14 @@ def load_subreddits() -> pd.DataFrame:
     return subreddits
 
 
-def load_txt_to_list(file_path: str) -> list[str]:
+def load_txt_to_list(file_path: str) -> List[str]:
     with open(file_path, "r", encoding="utf-8") as file:
         data = file.read().splitlines()
 
         return data
 
 
-def save_df_as_json(data: pd.DataFrame | dd.DataFrame, target_file: str):
+def save_df_as_json(data: Union[pd.DataFrame, dd.DataFrame], target_file: str):
     output_folder = f"{DATA_DIR}/output"
     data.to_json(
         f"{output_folder}/{target_file}",
