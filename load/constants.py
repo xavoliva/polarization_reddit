@@ -1,9 +1,9 @@
 """
 Load data constants
 """
+import os
 
-# DATA_DIR = "/workspaces/polarization_reddit/data"
-DATA_DIR = "/home/xavi_oliva/Documents/Github/polarization_reddit/data"
+DATA_DIR = f"{os.getcwd()}/data"
 
 COMMENT_DTYPES = {
     "author": "string",
