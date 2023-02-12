@@ -11,8 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 
 from preprocessing.utils import split_by_party
-
-RNG = np.random.default_rng(42)
+from load.constants import SEED
 
 
 def get_party_q(user_term_matrix: sp.csr_matrix, excluded_user=None) -> np.ndarray:
@@ -156,6 +155,8 @@ def calculate_polarization(
             - Number of republican users: {rep_user_cnt}
             """
         )
+
+    RNG = np.random.default_rng(SEED)
 
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:

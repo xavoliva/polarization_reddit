@@ -63,3 +63,5 @@ CEN_SUBREDDITS = [
     "politics",
     "news",
 ]
+
+SEED = 42
