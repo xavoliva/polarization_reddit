@@ -16,3 +16,4 @@ vaderSentiment>=3.3.2
 black>=23.1.0
 gensim>=4.3.0
 sentence-transformers>=2.2.2
+polars>=0.16.10

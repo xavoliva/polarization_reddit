@@ -7,7 +7,10 @@ from typing import List, Union
 import networkx as nx
 import pandas as pd
 import dask.dataframe as dd
+import polars as pl
 from tqdm import tqdm
+
+from bz2 import BZ2File
 
 from load.constants import DATA_DIR, COMMENT_DTYPES, COMMENT_COLUMNS
 
@@ -44,8 +47,8 @@ def load_network(year: int, weighted=False) -> nx.Graph:
 
 
 def load_comments(
-    year: int, start_month: int = 1, stop_month: int = 12
-) -> pd.DataFrame:
+    year: int, start_month: int = 1, stop_month: int = 12, engine="pandas"
+):
     """Load all comments in a given year
 
     Args:
@@ -54,61 +57,67 @@ def load_comments(
         stop_month (int): stop month (included)
 
     Returns:
-        pd.DataFrame: comments pandas dataframe
+        DataFrame: comments dataframe
     """
     comments_folder = f"{DATA_DIR}/comments/comments_{year}"
     comments = []
+
     # Load comments in chunks
-    for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
-        comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.bz2"
-        for comments_chunk_df in pd.read_json(
-            comments_file_name,
+    if engine == "pandas":
+        for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
+            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.bz2"
+            for comments_chunk_df in pd.read_json(
+                comments_file_name,
+                compression="bz2",
+                orient="records",
+                lines=True,
+                dtype=COMMENT_DTYPES,
+                chunksize=1e4,
+            ):
+                comments_chunk_df = comments_chunk_df[
+                    (comments_chunk_df.body != "[deleted]")
+                    & (comments_chunk_df.author != "[deleted]")
+                    & (comments_chunk_df.language == "en")
+                ][COMMENT_COLUMNS]
+                comments.append(comments_chunk_df)
+
+        df_comments = pd.concat(comments, ignore_index=True)
+
+        return df_comments
+
+    elif engine == "polars":
+        queries = []
+        for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
+            comments_file_name = f"{comments_folder}_json/comments_{year}-{month:02}.json"
+            q = pl.scan_ndjson(comments_file_name)
+            queries.append(q)
+
+        df = pl.collect_all(queries)
+
+        return df
+
+    elif engine == "dask":
+        comments_file_names = [
+            f"{comments_folder}/comments_{year}-{month:02}.bz2"
+            for month in range(start_month, stop_month + 1)
+        ]
+
+        comments = dd.read_json(
+            comments_file_names,
             compression="bz2",
             orient="records",
             lines=True,
+            # blocksize=None,  # 500e6 = 500MB
             dtype=COMMENT_DTYPES,
-            chunksize=1e4,
-        ):
-            comments_chunk_df = comments_chunk_df[
-                (comments_chunk_df.body != "[deleted]")
-                & (comments_chunk_df.author != "[deleted]")
-                & (comments_chunk_df.language == "en")
-            ][COMMENT_COLUMNS]
-            comments.append(comments_chunk_df)
+        )
 
-    df_comments = pd.concat(comments, ignore_index=True)
+        comments = comments[
+            (comments["author"] != "[deleted]")
+            & (comments["body"] != "[deleted]")
+            & (comments["language"] == "en")
+        ][COMMENT_COLUMNS]
 
-    return df_comments
-
-
-def load_comments_dask(
-    year: int,
-    start_month: int = 1,
-    stop_month: int = 12,
-) -> dd.DataFrame:
-    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
-
-    comments_file_names = [
-        f"{comments_folder}/comments_{year}-{month:02}.bz2"
-        for month in range(start_month, stop_month + 1)
-    ]
-
-    comments = dd.read_json(
-        comments_file_names,
-        compression="bz2",
-        orient="records",
-        lines=True,
-        # blocksize=None,  # 500e6 = 500MB
-        dtype=COMMENT_DTYPES,
-    )
-
-    comments = comments[
-        (comments["author"] != "[deleted]")
-        & (comments["body"] != "[deleted]")
-        & (comments["language"] == "en")
-    ][COMMENT_COLUMNS]
-
-    return comments
+        return comments
 
 
 def load_users() -> pd.DataFrame:
