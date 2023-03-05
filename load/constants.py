@@ -9,11 +9,11 @@ COMMENT_DTYPES = {
     "author": "string",
     "body": "string",
     "body_cleaned": "string",
-    "controversiality": "int",
+    "controversiality": "bool",
     "created_utc": "int64",
-    "distinguished": "int",
-    "edited": "int",
-    "gilded": "int",
+    "distinguished": "bool",
+    "edited": "bool",
+    "gilded": "bool",
     "id": "string",
     "language": "string",
     "link_id": "string",
@@ -33,30 +33,34 @@ COMMENT_COLUMNS = [
     "subreddit",
 ]
 
-ALL_USER_COLUMNS = [
-    "author",
-    "automoderator",
-    "bot",
-    "gender",
-    "angry",
-    "anti",
-    "astro",
-    "dangerous",
-    "doom",
-    "military",
-    "nobility",
-    "trump",
-]
+USER_DTYPES = {
+    "author": "string",
+    "automoderator": "bool",
+    "bot": "bool",
+    "gender": "string",
+    "angry": "bool",
+    "anti": "bool",
+    "astro": "bool",
+    "dangerous": "bool",
+    "doom": "bool",
+    "military": "bool",
+    "nobility": "bool",
+    "trump": "bool",
+}
 
-ALL_SUBREDDIT_COLUMNS = [
-    "subreddit",
-    "banned",
-    "gun",
-    "meta",
-    "party",
-    "politician",
-    "region",
-]
+ALL_USER_COLUMNS = USER_DTYPES.keys()
+
+SUBREDDIT_DTYPES = {
+    "subreddit": "string",
+    "banned": "bool",
+    "gun": "bool",
+    "meta": "bool",
+    "party": "string",
+    "politician": "bool",
+    "region": "string",
+}
+
+ALL_SUBREDDIT_COLUMNS = SUBREDDIT_DTYPES.keys()
 
 CEN_SUBREDDITS = [
     "worldnews",

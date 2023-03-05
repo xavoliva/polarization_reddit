@@ -72,25 +72,17 @@ def load_event_comments(event_name: str, file_type: str = "parquet") -> pd.DataF
 
 
 def save_event_comments(
-    event_comments: pd.DataFrame, event_name: str, file_type: str = "parquet"
+    event_comments: pd.DataFrame, event_name: str
 ):
     """
     Save event dataframe
     """
-    if file_type == "csv":
-        event_comments.to_csv(
-            f"{EVENTS_DIR}/{event_name}_comments.parquet",
-            engine="pyarrow",
-            compression="snappy",
-        )
-    elif file_type == "parquet":
-        event_comments.to_parquet(
-            f"{EVENTS_DIR}/{event_name}_comments.parquet",
-            engine="pyarrow",
-            compression="snappy",
-        )
-    else:
-        raise NotImplementedError(f"File type {file_type} not allowed.")
+    
+    event_comments.to_parquet(
+        f"{EVENTS_DIR}/{event_name}_comments.parquet",
+        engine="pyarrow",
+        compression="snappy",
+    )
 
 
 def save_event_vocab(event_vocab: Dict[str, int], event_name: str):

@@ -10,9 +10,13 @@ import dask.dataframe as dd
 import polars as pl
 from tqdm import tqdm
 
-from bz2 import BZ2File
-
-from load.constants import DATA_DIR, COMMENT_DTYPES, COMMENT_COLUMNS
+from load.constants import (
+    COMMENT_COLUMNS,
+    COMMENT_DTYPES,
+    DATA_DIR,
+    SUBREDDIT_DTYPES,
+    USER_DTYPES,
+)
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -65,21 +69,23 @@ def load_comments(
     # Load comments in chunks
     if engine == "pandas":
         for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
-            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.bz2"
-            for comments_chunk_df in pd.read_json(
+            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.json"
+            comments_month = pd.read_json(
                 comments_file_name,
-                compression="bz2",
+                # compression="bz2",
                 orient="records",
                 lines=True,
                 dtype=COMMENT_DTYPES,
-                chunksize=1e4,
-            ):
-                comments_chunk_df = comments_chunk_df[
-                    (comments_chunk_df.body != "[deleted]")
-                    & (comments_chunk_df.author != "[deleted]")
-                    & (comments_chunk_df.language == "en")
-                ][COMMENT_COLUMNS]
-                comments.append(comments_chunk_df)
+                # chunksize=1e4,
+            )
+
+            comments_month = comments_month[
+                (comments_month.body != "[deleted]")
+                & (comments_month.author != "[deleted]")
+                & (comments_month.language == "en")
+            ][COMMENT_COLUMNS]
+
+            comments.append(comments_month)
 
         df_comments = pd.concat(comments, ignore_index=True)
 
@@ -87,14 +93,34 @@ def load_comments(
 
     elif engine == "polars":
         queries = []
-        for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
-            comments_file_name = f"{comments_folder}_json/comments_{year}-{month:02}.json"
+        for month in range(start_month, stop_month + 1):
+            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.json"
             q = pl.scan_ndjson(comments_file_name)
             queries.append(q)
 
-        df = pl.collect_all(queries)
+        df_list = pl.collect_all(queries)
 
-        return df
+        return (
+            pl.concat(
+                [
+                    df.filter(
+                        (pl.col("body") != "[deleted]")
+                        & (pl.col("author") != "[deleted]")
+                        & (pl.col("language") == "en")
+                    ).select(COMMENT_COLUMNS)
+                    for df in df_list
+                ]
+            )
+            .to_pandas()
+            .astype(
+                {
+                    "author": "string",
+                    "body_cleaned": "string",
+                    "created_utc": "int64",
+                    "subreddit": "string",
+                }
+            )
+        )
 
     elif engine == "dask":
         comments_file_names = [
@@ -117,7 +143,7 @@ def load_comments(
             & (comments["language"] == "en")
         ][COMMENT_COLUMNS]
 
-        return comments
+        return comments.compute()
 
 
 def load_users() -> pd.DataFrame:
@@ -132,14 +158,14 @@ def load_users() -> pd.DataFrame:
         orient="records",
         lines=True,
         chunksize=1e4,
+        dtype=USER_DTYPES,
     ):
         users_chunk_df = users_chunk_df[
-            (users_chunk_df.bot == 0) & (users_chunk_df.automoderator == 0)
+            (~users_chunk_df.bot) & (~users_chunk_df.automoderator)
         ]
         users.append(users_chunk_df)
 
     df_users = pd.concat(users, ignore_index=True)
-
     return df_users
 
 
@@ -149,20 +175,8 @@ def load_user_party(year: int) -> pd.DataFrame:
     Returns:
         pd.DataFrame: user-party dataframe
     """
-    user_party = pd.read_json(f"{DATA_DIR}/output/user_party_{year}.json", lines=True)
-
-    return user_party
-
-
-def load_user_party_parquet(year: int) -> dd.DataFrame:
-    """Load user party affiliation
-
-    Returns:
-        dd.DataFrame: user-party dataframe
-    """
     user_party = pd.read_parquet(
         f"{DATA_DIR}/output/user_party_{year}.parquet",
-        columns=["author", "party"],
     )
 
     return user_party
@@ -178,15 +192,7 @@ def load_subreddits() -> pd.DataFrame:
         f"{DATA_DIR}/metadata/subreddits_metadata.json",
         orient="records",
         lines=True,
-        dtype={
-            "subreddit": "string",
-            "banned": "bool",
-            "gun": "bool",
-            "meta": "bool",
-            "party": "string",
-            "politician": "bool",
-            "region": "string",
-        },
+        dtype=SUBREDDIT_DTYPES,
     )
 
     # Filter out regional and international subreddits

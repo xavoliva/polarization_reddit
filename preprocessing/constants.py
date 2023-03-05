@@ -7,6 +7,7 @@ from load.constants import DATA_DIR
 
 EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
+METADATA_DIR = f"{DATA_DIR}/metadata"
 
 EVENTS_INFO = {
     "us_elections_2008": {
@@ -32,10 +33,7 @@ EVENTS_INFO = {
 }
 
 ELECTIONS_KEYWORDS = [
-    "vote",
-    "us",
-    "usa",
-    "election",
+    "vot",
     "president",
     "candidate",
     "democrat",
