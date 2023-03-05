@@ -1,7 +1,7 @@
 """
 Polarization utils
 """
-# import warnings
+# import logging
 from typing import Dict
 
 import numpy as np
@@ -17,11 +17,14 @@ from load.constants import SEED
 def get_party_q(
     term_cnt_vec,
     total_token_cnt,
-    excluded_user_term_vec=None,
+    excluded_user_term_cnt_vec=None,
+    excluded_user_token_cnt=None,
 ) -> np.ndarray:
-    if not excluded_user_term_vec is None:
-        term_cnt_vec -= excluded_user_term_vec
-        total_token_cnt -= excluded_user_term_vec.sum()
+    if not excluded_user_term_cnt_vec is None:
+        leaveout_term_cnt_vec = term_cnt_vec - excluded_user_term_cnt_vec
+        leaveout_total_token_cnt = total_token_cnt - excluded_user_token_cnt
+
+        return leaveout_term_cnt_vec / leaveout_total_token_cnt
 
     return term_cnt_vec / total_token_cnt
 
@@ -29,10 +32,10 @@ def get_party_q(
 def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
     denom = dem_q + rep_q
 
-    nr_zero_values_denominator = np.count_nonzero(denom == 0)
+    # nr_zero_values_denominator = np.count_nonzero(denom == 0)
 
     # if nr_zero_values_denominator > 5:
-    #     warnings.warn(
+    #     logging.warning(
     #         f"A lot of values in the denominator are zero: {nr_zero_values_denominator}"
     #     )
 
@@ -65,6 +68,9 @@ def calculate_leaveout_polarization(
     dem_term_cnt_vec = dem_user_term_matrix.sum(axis=0).A1
     rep_term_cnt_vec = rep_user_term_matrix.sum(axis=0).A1
 
+    dem_users_term_cnt_vec = dem_user_term_matrix.sum(axis=1).A1
+    rep_users_term_cnt_vec = rep_user_term_matrix.sum(axis=1).A1
+
     dem_total_token_cnt = dem_term_cnt_vec.sum()
     rep_total_token_cnt = rep_term_cnt_vec.sum()
 
@@ -86,6 +92,7 @@ def calculate_leaveout_polarization(
             dem_term_cnt_vec,
             dem_total_token_cnt,
             dem_user_term_vec,
+            dem_users_term_cnt_vec[i],
         )
         dem_token_scores = get_rho(dem_leaveout_q, rep_q)
 
@@ -104,10 +111,11 @@ def calculate_leaveout_polarization(
             rep_term_cnt_vec,
             rep_total_token_cnt,
             rep_user_term_vec,
+            rep_users_term_cnt_vec[j],
         )
         rep_token_scores = 1.0 - get_rho(dem_q, rep_leaveout_q)
 
-        rep_user_term_freq_vec = rep_user_term_freq_matrix[i].todense().A1
+        rep_user_term_freq_vec = rep_user_term_freq_matrix[j].todense().A1
 
         rep_user_polarization = rep_user_term_freq_vec.dot(rep_token_scores)
         rep_user_polarizations.append(rep_user_polarization)
