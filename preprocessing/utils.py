@@ -77,11 +77,12 @@ def save_event_comments(
     """
     Save event dataframe
     """
-    
+
     event_comments.to_parquet(
         f"{EVENTS_DIR}/{event_name}_comments.parquet",
         engine="pyarrow",
         compression="snappy",
+        index=False,
     )
 
 

@@ -248,7 +248,7 @@ def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
             )
         )
 
-    return pd.DataFrame(
+    polarization_time = pd.DataFrame(
         polarization,
         columns=[
             "polarization",
@@ -256,4 +256,16 @@ def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
             "user_cnt",
             "date",
         ],
+        dtype={
+            "polarization": "float",
+            "random_polarization": "float",
+            "user_cnt": "int",
+            "date": "string",
+        },
     )
+
+    polarization_time["date"] = pd.to_datetime(
+        polarization_time["date"],
+    )
+
+    return polarization_time
