@@ -14,22 +14,19 @@ from preprocessing.utils import split_by_party
 from load.constants import SEED
 
 
-def get_party_q(user_term_matrix: sp.csr_matrix, excluded_user=None) -> np.ndarray:
+def get_party_q(
+    term_cnt_vec,
+    total_token_cnt,
+    excluded_user_term_vec=None,
+) -> np.ndarray:
+    if not excluded_user_term_vec is None:
+        term_cnt_vec -= excluded_user_term_vec
+        total_token_cnt -= excluded_user_term_vec.sum()
 
-    term_cnt = user_term_matrix.sum(axis=0).A1
-    total_token_cnt = user_term_matrix.sum()
-
-    if excluded_user:
-        user_term_vec = user_term_matrix[excluded_user].todense().A1
-
-        term_cnt -= user_term_vec
-        total_token_cnt -= user_term_vec.sum()
-
-    return term_cnt / total_token_cnt
+    return term_cnt_vec / total_token_cnt
 
 
 def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
-
     denom = dem_q + rep_q
 
     nr_zero_values_denominator = np.count_nonzero(denom == 0)
@@ -65,14 +62,31 @@ def calculate_leaveout_polarization(
     nr_dem_users = dem_user_term_matrix.shape[0]
     nr_rep_users = rep_user_term_matrix.shape[0]
 
-    dem_q = get_party_q(dem_user_term_matrix)
-    rep_q = get_party_q(rep_user_term_matrix)
+    dem_term_cnt_vec = dem_user_term_matrix.sum(axis=0).A1
+    rep_term_cnt_vec = rep_user_term_matrix.sum(axis=0).A1
+
+    dem_total_token_cnt = dem_term_cnt_vec.sum()
+    rep_total_token_cnt = rep_term_cnt_vec.sum()
+
+    dem_q = get_party_q(
+        dem_term_cnt_vec,
+        dem_total_token_cnt,
+    )
+    rep_q = get_party_q(
+        rep_term_cnt_vec,
+        rep_total_token_cnt,
+    )
 
     # Republican polarization
     dem_user_polarizations = []
 
     for i in tqdm(range(nr_dem_users), desc="Democrat polarization"):
-        dem_leaveout_q = get_party_q(dem_user_term_matrix, i)
+        dem_user_term_vec = dem_user_term_matrix[i].todense().A1
+        dem_leaveout_q = get_party_q(
+            dem_term_cnt_vec,
+            dem_total_token_cnt,
+            dem_user_term_vec,
+        )
         dem_token_scores = get_rho(dem_leaveout_q, rep_q)
 
         dem_user_term_freq_vec = dem_user_term_freq_matrix[i].todense().A1
@@ -84,8 +98,13 @@ def calculate_leaveout_polarization(
     # Republican polarization
     rep_user_polarizations = []
 
-    for i in tqdm(range(nr_rep_users), desc="Republican polarization"):
-        rep_leaveout_q = get_party_q(rep_user_term_matrix, i)
+    for j in tqdm(range(nr_rep_users), desc="Republican polarization"):
+        rep_user_term_vec = rep_user_term_matrix[j].todense().A1
+        rep_leaveout_q = get_party_q(
+            rep_term_cnt_vec,
+            rep_total_token_cnt,
+            rep_user_term_vec,
+        )
         rep_token_scores = 1.0 - get_rho(dem_q, rep_leaveout_q)
 
         rep_user_term_freq_vec = rep_user_term_freq_matrix[i].todense().A1
@@ -111,6 +130,10 @@ def build_user_term_matrix(comments, vocab: Dict[str, int]):
     user_matrix = vec.transform(user_tokens["tokens"])
 
     return user_matrix
+
+
+def calculate_penalized_polarization():
+    pass
 
 
 def calculate_polarization(
@@ -198,7 +221,6 @@ def calculate_polarization(
 
 
 def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
-
     polarization = []
     for datetime, date_comments in event_comments.groupby(
         pd.Grouper(key="datetime", freq=freq)
