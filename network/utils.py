@@ -28,8 +28,7 @@ def filter_node(
     return False
 
 
-def draw_network(network, weighted, threshold=50):
-    plt.figure(figsize=(30, 30), dpi=80)
+def draw_network(network, weighted, year, threshold=20):
 
     pos = nx.spring_layout(network, seed=7)
 
@@ -59,4 +58,3 @@ def draw_network(network, weighted, threshold=50):
     ax = plt.gca()
     ax.margins(0.08)
     plt.axis("off")
-    plt.show()

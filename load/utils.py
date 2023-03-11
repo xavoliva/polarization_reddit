@@ -18,6 +18,8 @@ from load.constants import (
     USER_DTYPES,
 )
 
+pd.options.mode.dtype_backend = "pyarrow"
+
 
 def load_network(year: int, weighted=False) -> nx.Graph:
     """Load subreddits network of given year
@@ -75,6 +77,7 @@ def load_comments(
                 # compression="bz2",
                 orient="records",
                 lines=True,
+                use_nullable_dtypes=True,
                 dtype=COMMENT_DTYPES,
                 # chunksize=1e4,
             )
@@ -100,27 +103,27 @@ def load_comments(
 
         df_list = pl.collect_all(queries)
 
-        return (
-            pl.concat(
-                [
-                    df.filter(
-                        (pl.col("body") != "[deleted]")
-                        & (pl.col("author") != "[deleted]")
-                        & (pl.col("language") == "en")
-                    ).select(COMMENT_COLUMNS)
-                    for df in df_list
-                ]
-            )
-            .to_pandas()
-            .astype(
-                {
-                    "author": "string",
-                    "body_cleaned": "string",
-                    "created_utc": "int64",
-                    "subreddit": "string",
-                }
-            )
+        df_pl = pl.concat(
+            [
+                df.filter(
+                    (pl.col("body") != "[deleted]")
+                    & (pl.col("author") != "[deleted]")
+                    & (pl.col("language") == "en")
+                ).select(COMMENT_COLUMNS)
+                for df in df_list
+            ]
         )
+
+        return df_pl
+
+        # return df_pl.to_pandas().astype(
+        #     {
+        #         "author": "string[pyarrow]",
+        #         "body_cleaned": "string[pyarrow]",
+        #         "created_utc": "int64[pyarrow]",
+        #         "subreddit": "string[pyarrow]",
+        #     }
+        # )
 
     elif engine == "dask":
         comments_file_names = [
@@ -146,27 +149,29 @@ def load_comments(
         return comments.compute()
 
 
-def load_users() -> pd.DataFrame:
+def load_users(engine) -> pd.DataFrame:
     """Load all users
 
     Returns:
         pd.DataFrame: user dataframe
     """
-    users = []
-    for users_chunk_df in pd.read_json(
-        f"{DATA_DIR}/metadata/users_metadata.json",
-        orient="records",
-        lines=True,
-        chunksize=1e4,
-        dtype=USER_DTYPES,
-    ):
-        users_chunk_df = users_chunk_df[
-            (~users_chunk_df.bot) & (~users_chunk_df.automoderator)
-        ]
-        users.append(users_chunk_df)
+    users_file_name = f"{DATA_DIR}/metadata/users_metadata.json"
+    if engine == "pandas":
+        df = pd.read_json(
+            users_file_name,
+            orient="records",
+            lines=True,
+            dtype=USER_DTYPES,
+        )
+        df = df[~(df.bot) & ~(df.automoderator)]
+        return df
 
-    df_users = pd.concat(users, ignore_index=True)
-    return df_users
+    elif engine == "polars":
+        df_pl = pl.read_ndjson(users_file_name)
+
+        df_pl = df_pl.filter(~(pl.col("bot") == 1) & ~(pl.col("automoderator") == 1))
+
+        return df_pl.to_pandas().astype(USER_DTYPES)
 
 
 def load_user_party(year: int) -> pd.DataFrame:

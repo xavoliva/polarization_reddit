@@ -13,6 +13,8 @@ from tqdm import tqdm
 from preprocessing.utils import split_by_party
 from load.constants import SEED
 
+pd.options.mode.dtype_backend = "pyarrow"
+
 
 def get_party_q(
     term_cnt_vec,
@@ -256,12 +258,15 @@ def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
             "user_cnt",
             "date",
         ],
-        dtype={
+    )
+
+    polarization_time = polarization_time.astype(
+        {
             "polarization": "float",
             "random_polarization": "float",
             "user_cnt": "int",
             "date": "string",
-        },
+        }
     )
 
     polarization_time["date"] = pd.to_datetime(

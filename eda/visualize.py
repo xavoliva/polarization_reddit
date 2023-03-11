@@ -1,6 +1,9 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
-import dask.dataframe as dd
+import pandas as pd
+from tqdm import tqdm
+
+tqdm.pandas()
 
 from eda.constants import FIGURES_DIR, FIG_SIZE
 from preprocessing.utils import get_sentiment_score
@@ -8,8 +11,8 @@ from preprocessing.utils import get_sentiment_score
 sns.set(rc={"figure.figsize": FIG_SIZE})
 
 
-def barplot_top(comments: dd.DataFrame, column: str, year: int, n: int = 10):
-    top_comments = comments[[column]].groupby(by=column).size().nlargest(n=n).compute()
+def barplot_top(comments: pd.DataFrame, column: str, year: int, n: int = 10):
+    top_comments = comments[[column]].groupby(by=column).size().nlargest(n=n)
 
     ax = sns.barplot(x=top_comments.index, y=top_comments.values)
     if n > 15:
@@ -26,8 +29,8 @@ def barplot_top(comments: dd.DataFrame, column: str, year: int, n: int = 10):
     plt.show()
 
 
-def plot_daily_comments(comments: dd.DataFrame, year: int):
-    daily_comments = comments[["date"]].groupby(by="date").size().compute()
+def plot_daily_comments(comments: pd.DataFrame, year: int):
+    daily_comments = comments[["date"]].groupby(by="date").count()
 
     ax = sns.lineplot(x=daily_comments.index, y=daily_comments.values)
 
@@ -44,12 +47,12 @@ def plot_daily_comments(comments: dd.DataFrame, year: int):
     plt.show()
 
 
-def plot_daily_sentiment(comments: dd.DataFrame, year: int):
-    comments["sentiment"] = comments["body_cleaned"].apply(
+def plot_daily_sentiment(comments: pd.DataFrame, year: int):
+    comments["sentiment"] = comments["body_cleaned"].progress_apply(
         get_sentiment_score, meta=("body_cleaned", "float")
     )
     comments_daily_sentiment = (
-        comments[["date", "sentiment"]].groupby(by="date")["sentiment"].mean().compute()
+        comments[["date", "sentiment"]].groupby(by="date")["sentiment"].mean()
     )
 
     ax = sns.lineplot(
