@@ -7,6 +7,7 @@ from typing import Dict, Tuple
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
 import pandas as pd
+import polars as pl
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -15,19 +16,40 @@ from preprocessing.constants import (
     EVENTS_DIR,
 )
 
-pd.options.mode.dtype_backend = 'pyarrow'
+pd.options.mode.dtype_backend = "pyarrow"
 
 
 sno = LancasterStemmer()
 
 
-def split_by_party(comments) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def split_by_party(comments, backend="pandas") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     split dataframe by party
     """
+    if backend == "pandas":
+        [dem_comments, rep_comments] = [
+            g
+            for _, g in comments.groupby(
+                "party",
+                sort=True,
+            )
+        ]
+    elif backend == "polars":
+        partisan_comments = [
+            (party, g)
+            for party, g in comments.groupby(
+                pl.col("party"),
+            )
+        ]
+
+        [dem_comments, rep_comments] = sorted(
+            partisan_comments,
+            key=lambda x: x[0],
+        )
+
     return (
-        comments[comments["party"] == "dem"],
-        comments[comments["party"] == "rep"],
+        dem_comments[1],
+        rep_comments[1],
     )
 
 
@@ -51,31 +73,28 @@ def tokenize_comment(comment: str, stemmer: bool = True) -> str:
     return " ".join(tokens)
 
 
-def load_event_comments(event_name: str, file_type: str = "parquet") -> pd.DataFrame:
+def load_event_comments(event_name: str, backend: str = "pandas") -> pd.DataFrame:
     """
     Load dataframe from event
     """
-    comments_file = f"{EVENTS_DIR}/{event_name}_comments"
+    comments_file = f"{EVENTS_DIR}/{event_name}_comments.parquet"
 
-    if file_type == "csv":
-        event_comments = pd.read_csv(
-            f"{comments_file}.csv",
-            usecols=["author", "body_cleaned", "created_utc", "party"],
-        )
-    elif file_type == "parquet":
+    if backend == "pandas":
         event_comments = pd.read_parquet(
-            f"{comments_file}.parquet",
+            comments_file,
             engine="pyarrow",
         )
+    elif backend == "polars":
+        event_comments = pl.read_parquet(
+            comments_file,
+        )
     else:
-        raise NotImplementedError(f"File type {file_type} not allowed.")
+        raise NotImplementedError(f"Backend {backend} not implemented.")
 
     return event_comments
 
 
-def save_event_comments(
-    event_comments: pd.DataFrame, event_name: str
-):
+def save_event_comments(event_comments: pd.DataFrame, event_name: str):
     """
     Save event dataframe
     """
