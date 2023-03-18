@@ -7,6 +7,8 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+from scipy import stats
+from scipy.optimize import minimize
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 
@@ -142,8 +144,50 @@ def build_user_term_matrix(comments, vocab: Dict[str, int]):
     return user_matrix
 
 
-def calculate_penalized_polarization():
-    pass
+def calculate_penalized_polarization(
+    dem_user_term_matrix: sp.csr_matrix,
+    rep_user_term_matrix: sp.csr_matrix,
+):
+    x = np.linspace(-10, 30, 100)
+
+    X0 = np.ones(shape=(100, 10))
+
+    mi = 1
+
+    cij = 1
+
+    lambda_1 = 0.5
+    lambda_2 = 0.5
+
+    def mle_norm(parameters):
+        # parameters = (len_vocab, nr_features + 2)
+        # alpha = (len_vocab,)
+        # gamma = (len_vocab, nr_features)
+        # phi = (len_vocab,)
+        # x = (nr_users, nr_features)
+        alpha = parameters[:, 0]
+        gamma = parameters[:, 1:-1]
+        phi = parameters[:, -1]
+        alpha, gamma, phi = parameters
+
+        u = alpha + x * gamma + phi * 1
+
+        return np.sum(
+            mi * np.exp(u)
+            - cij * u
+            + phi * lambda_1(abs(alpha) + np.abs(gamma))
+            + lambda_2 * abs(gamma)
+        )
+
+    mle_model = minimize(
+        fun=mle_norm,
+        x0=X0,
+        method="L-BFGS-B",
+    )
+
+    print(mle_model)
+
+    return mle_model["x"]
 
 
 def calculate_polarization(
