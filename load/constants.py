@@ -50,6 +50,19 @@ USER_DTYPES = {
 
 ALL_USER_COLUMNS = USER_DTYPES.keys()
 
+USER_COLUMNS = [
+    "author",
+    "gender",
+    "angry",
+    "anti",
+    "astro",
+    "dangerous",
+    "doom",
+    "military",
+    "nobility",
+    "trump",
+]
+
 SUBREDDIT_DTYPES = {
     "subreddit": "string[pyarrow]",
     "banned": "bool[pyarrow]",

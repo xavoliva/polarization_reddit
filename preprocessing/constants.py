@@ -5,8 +5,6 @@ import pandas as pd
 
 from load.constants import DATA_DIR
 
-pd.options.mode.dtype_backend = 'pyarrow'
-
 EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
 METADATA_DIR = f"{DATA_DIR}/metadata"

@@ -16,9 +16,8 @@ from load.constants import (
     DATA_DIR,
     SUBREDDIT_DTYPES,
     USER_DTYPES,
+    USER_COLUMNS,
 )
-
-pd.options.mode.dtype_backend = "pyarrow"
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -161,17 +160,18 @@ def load_users(engine) -> pd.DataFrame:
             users_file_name,
             orient="records",
             lines=True,
+            dtype_backend="pyarrow",
             dtype=USER_DTYPES,
         )
         df = df[~(df.bot) & ~(df.automoderator)]
-        return df
+        return df[USER_COLUMNS]
 
     elif engine == "polars":
         df_pl = pl.read_ndjson(users_file_name)
 
         df_pl = df_pl.filter(~(pl.col("bot") == 1) & ~(pl.col("automoderator") == 1))
 
-        return df_pl.to_pandas().astype(USER_DTYPES)
+        return df_pl.to_pandas().astype(USER_DTYPES)[USER_COLUMNS]
 
 
 def load_user_party(year: int) -> pd.DataFrame:

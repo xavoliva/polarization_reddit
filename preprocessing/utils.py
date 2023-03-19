@@ -16,9 +16,6 @@ from preprocessing.constants import (
     EVENTS_DIR,
 )
 
-pd.options.mode.dtype_backend = "pyarrow"
-
-
 sno = LancasterStemmer()
 
 

@@ -15,8 +15,6 @@ from tqdm import tqdm
 from preprocessing.utils import split_by_party
 from load.constants import SEED
 
-pd.options.mode.dtype_backend = "pyarrow"
-
 
 def get_party_q(
     term_cnt_vec,
@@ -144,45 +142,60 @@ def build_user_term_matrix(comments, vocab: Dict[str, int]):
     return user_matrix
 
 
-def calculate_penalized_polarization(
-    dem_user_term_matrix: sp.csr_matrix,
-    rep_user_term_matrix: sp.csr_matrix,
-):
-    x = np.linspace(-10, 30, 100)
+def calculate_penalized_polarization():
+    nr_users = 200
+    len_vocab = 100
+    nr_features = 10
 
-    X0 = np.ones(shape=(100, 10))
+    X = np.ones(shape=(nr_users, nr_features))
+    Params0 = np.ones(shape=(len_vocab * (nr_features + 2)), dtype="float32")
 
-    mi = 1
+    mi = np.ones(shape=(nr_users, 1))
 
-    cij = 1
+    cij = np.ones(shape=(nr_users, len_vocab))
 
-    lambda_1 = 0.5
-    lambda_2 = 0.5
+    is_republican = np.ones(shape=(nr_users, 1))
 
-    def mle_norm(parameters):
-        # parameters = (len_vocab, nr_features + 2)
-        # alpha = (len_vocab,)
+    lambda_1 = 10e-5
+    lambda_2 = 0.3 * np.ones(shape=(len_vocab))
+
+    def penalized_mle(parameters):
+        # parameters = (len_vocab * (nr_features + 2))
+        # alpha = (len_vocab, 1)
         # gamma = (len_vocab, nr_features)
-        # phi = (len_vocab,)
-        # x = (nr_users, nr_features)
-        alpha = parameters[:, 0]
-        gamma = parameters[:, 1:-1]
-        phi = parameters[:, -1]
-        alpha, gamma, phi = parameters
+        # phi = (len_vocab, 1)
+        # X = (nr_users, nr_features)
+        # mi = (nr_users, 1)
+        # cij = (nr_users, len_vocab)
+        # is_republican = (nr_users, 1)
 
-        u = alpha + x * gamma + phi * 1
+        # u = (nr_users, len_vocab)
 
-        return np.sum(
+        alpha = parameters[:len_vocab]
+        Gamma = parameters[len_vocab : len_vocab + len_vocab * nr_features].reshape(
+            (len_vocab, nr_features)
+        )
+        phi = parameters[-len_vocab:]
+
+        u = alpha + X @ Gamma.T + np.outer(is_republican, phi)
+
+        out = np.sum(
             mi * np.exp(u)
             - cij * u
-            + phi * lambda_1(abs(alpha) + np.abs(gamma))
-            + lambda_2 * abs(gamma)
+            + phi * lambda_1 * (np.abs(alpha) + np.sum(np.abs(Gamma), axis=1))
+            + lambda_2 * np.abs(phi)
         )
 
+        return out
+
     mle_model = minimize(
-        fun=mle_norm,
-        x0=X0,
+        fun=penalized_mle,
+        x0=Params0,
         method="L-BFGS-B",
+        options={
+            "maxiter": 100,
+            "disp": True,
+        }
     )
 
     print(mle_model)
