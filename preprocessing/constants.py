@@ -13,22 +13,35 @@ EVENTS_INFO = {
     "us_elections_2008": {
         "name": "2008 US presidential election",
         "date": pd.to_datetime("11-04-2008"),
+         "relevant_dates": {}
     },
     "us_elections_2012": {
         "name": "2012 US presidential election",
         "date": pd.to_datetime("11-06-2012"),
+         "relevant_dates": {}
     },
     "us_midterms_2014": {
         "name": "2014 US midterm elections",
         "date": pd.to_datetime("11-04-2014"),
+         "relevant_dates": {}
     },
     "us_elections_2016": {
         "name": "2016 US presidential election",
         "date": pd.to_datetime("11-08-2016"),
+        "relevant_dates": {
+            "Super Tuesday": pd.to_datetime("03-01-2016"),
+            "Donald Trump secures Republican presidential nomination": pd.to_datetime("05-26-2016"),
+            "Hillary Clinton secures Democratic presidential nomination": pd.to_datetime("06-06-2016"),
+            "First presidential general election debate": pd.to_datetime("09-26-2016"),
+            "Leaked tape & WikiLeaks publication": pd.to_datetime("10-07-2016"),
+            "Second presidential general election debate": pd.to_datetime("10-09-2016"),
+            "Third presidential general election debate": pd.to_datetime("10-19-2016"),
+        }
     },
     "us_midterms_2018": {
         "name": "2018 US midterm elections",
         "date": pd.to_datetime("11-06-2018"),
+         "relevant_dates": {}
     },
 }
 
