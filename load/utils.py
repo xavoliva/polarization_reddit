@@ -6,7 +6,6 @@ from typing import List, Union
 
 import networkx as nx
 import pandas as pd
-import dask.dataframe as dd
 import polars as pl
 from tqdm import tqdm
 
@@ -18,6 +17,8 @@ from load.constants import (
     USER_DTYPES,
     USER_COLUMNS,
 )
+
+from preprocessing.constants import OUTPUT_DIR
 
 
 def load_network(year: int, weighted=False) -> nx.Graph:
@@ -52,10 +53,12 @@ def load_network(year: int, weighted=False) -> nx.Graph:
 
 
 def load_comments(
-    year: int, start_month: int = 1, stop_month: int = 12, engine="pandas"
+    years: Union[int, List[int]],
+    start_month: int = 1,
+    stop_month: int = 12,
+    engine="pandas",
 ):
     """Load all comments in a given year
-
     Args:
         year (int): year
         start_month (int): start month
@@ -64,41 +67,61 @@ def load_comments(
     Returns:
         DataFrame: comments dataframe
     """
-    comments_folder = f"{DATA_DIR}/comments/comments_{year}"
-    comments = []
+    if isinstance(years, int):
+        years = [years]
 
     # Load comments in chunks
     if engine == "pandas":
-        for month in tqdm(range(start_month, stop_month + 1), desc="Months"):
-            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.json"
-            comments_month = pd.read_json(
-                comments_file_name,
-                # compression="bz2",
-                orient="records",
-                lines=True,
-                use_nullable_dtypes=True,
-                dtype=COMMENT_DTYPES,
-                # chunksize=1e4,
+        for i, year in enumerate(years):
+            comments = []
+            comments_folder = f"{DATA_DIR}/comments/comments_{year}"
+
+            months = range(
+                start_month if i == 0 else 1,
+                stop_month + 1 if i == len(years) - 1 else 12 + 1,
             )
 
-            comments_month = comments_month[
-                (comments_month.body != "[deleted]")
-                & (comments_month.author != "[deleted]")
-                & (comments_month.language == "en")
-            ][COMMENT_COLUMNS]
+            for month in tqdm(months, desc="Months"):
+                comments_file_name = (
+                    f"{comments_folder}/comments_{year}-{month:02}.json"
+                )
+                comments_month = pd.read_json(
+                    comments_file_name,
+                    # compression="bz2",
+                    orient="records",
+                    lines=True,
+                    use_nullable_dtypes=True,
+                    dtype=COMMENT_DTYPES,
+                    # chunksize=1e4,
+                )
 
-            comments.append(comments_month)
+                comments_month = comments_month[
+                    (comments_month.body != "[deleted]")
+                    & (comments_month.author != "[deleted]")
+                    & (comments_month.language == "en")
+                ][COMMENT_COLUMNS]
 
-        df_comments = pd.concat(comments, ignore_index=True)
+                comments.append(comments_month)
 
-        return df_comments
+            df_comments = pd.concat(comments, ignore_index=True)
+
+            return df_comments
 
     elif engine == "polars":
         queries = []
-        for month in range(start_month, stop_month + 1):
-            comments_file_name = f"{comments_folder}/comments_{year}-{month:02}.json"
-            q = pl.scan_ndjson(comments_file_name)
-            queries.append(q)
+        for i, year in enumerate(years):
+            comments_folder = f"{DATA_DIR}/comments/comments_{year}"
+            months = range(
+                start_month if i == 0 else 1,
+                stop_month + 1 if i == len(years) - 1 else 12 + 1,
+            )
+
+            for month in months:
+                comments_file_name = (
+                    f"{comments_folder}/comments_{year}-{month:02}.json"
+                )
+                q = pl.scan_ndjson(comments_file_name)
+                queries.append(q)
 
         df_list = pl.collect_all(queries)
 
@@ -123,29 +146,6 @@ def load_comments(
         #         "subreddit": "string[pyarrow]",
         #     }
         # )
-
-    elif engine == "dask":
-        comments_file_names = [
-            f"{comments_folder}/comments_{year}-{month:02}.bz2"
-            for month in range(start_month, stop_month + 1)
-        ]
-
-        comments = dd.read_json(
-            comments_file_names,
-            compression="bz2",
-            orient="records",
-            lines=True,
-            # blocksize=None,  # 500e6 = 500MB
-            dtype=COMMENT_DTYPES,
-        )
-
-        comments = comments[
-            (comments["author"] != "[deleted]")
-            & (comments["body"] != "[deleted]")
-            & (comments["language"] == "en")
-        ][COMMENT_COLUMNS]
-
-        return comments.compute()
 
 
 def load_users(engine) -> pd.DataFrame:
@@ -181,7 +181,7 @@ def load_user_party(year: int) -> pd.DataFrame:
         pd.DataFrame: user-party dataframe
     """
     user_party = pd.read_parquet(
-        f"{DATA_DIR}/output/user_party_{year}.parquet",
+        f"{OUTPUT_DIR}/user_party_{year}.parquet",
     )
 
     return user_party
@@ -213,10 +213,9 @@ def load_txt_to_list(file_path: str) -> List[str]:
         return data
 
 
-def save_df_as_json(data: Union[pd.DataFrame, dd.DataFrame], target_file: str):
-    output_folder = f"{DATA_DIR}/output"
+def save_df_as_json(data: pd.DataFrame, target_file: str):
     data.to_json(
-        f"{output_folder}/{target_file}",
+        f"{OUTPUT_DIR}/{target_file}",
         orient="records",
         lines=True,
         index=False,
@@ -224,10 +223,16 @@ def save_df_as_json(data: Union[pd.DataFrame, dd.DataFrame], target_file: str):
 
 
 def save_df_as_parquet(data: pd.DataFrame, target_file: str):
-    output_folder = f"{DATA_DIR}/output"
     data.to_parquet(
-        f"{output_folder}/{target_file}",
+        f"{OUTPUT_DIR}/{target_file}",
         engine="pyarrow",
         compression="snappy",
         index=False,
+    )
+
+
+def load_df_from_parquet(file_name: str) -> pd.DataFrame:
+    return pd.read_parquet(
+        f"{OUTPUT_DIR}/{file_name}",
+        engine="pyarrow",
     )

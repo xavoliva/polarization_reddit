@@ -10,8 +10,10 @@ from preprocessing.utils import (
 
 class Preprocessing(unittest.TestCase):
     def test_get_event_regex_and(self):
-        expected = "(vot|elect)&(presid)"
-        actual = get_event_regex(["voting", "elections"], ["president"], "and")
+        expected = "(vot|elect)&(presid elect|ballot)"
+        actual = get_event_regex(
+            ["voting", "elections"], ["president election", "ballots"], "and"
+        )
 
         self.assertEqual(expected, actual)
 
