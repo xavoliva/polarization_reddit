@@ -121,7 +121,7 @@ def get_sentiment_score(comment: str) -> float:
     return sia.polarity_scores(comment)["compound"]
 
 
-def calculate_user_party(user_comments) -> pd.Series:
+def calculate_user_party(user_comments: pd.DataFrame) -> pd.Series:
     user_party = {}
 
     dem_cnt = len(user_comments[user_comments["party"] == "dem"])
