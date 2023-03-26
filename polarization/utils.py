@@ -194,8 +194,9 @@ def calculate_penalized_polarization():
         method="L-BFGS-B",
         options={
             "maxiter": 100,
+            "maxcor": 1000,
             "disp": True,
-        }
+        },
     )
 
     print(mle_model)

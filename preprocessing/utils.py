@@ -25,8 +25,8 @@ def split_by_party(comments, backend="pandas") -> Tuple[pd.DataFrame, pd.DataFra
     """
     if backend == "pandas":
         [dem_comments, rep_comments] = [
-            g
-            for _, g in comments.groupby(
+            (party, g)
+            for party, g in comments.groupby(
                 "party",
                 sort=True,
             )

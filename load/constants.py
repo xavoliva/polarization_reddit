@@ -31,6 +31,8 @@ COMMENT_COLUMNS = [
     "body_cleaned",
     "created_utc",
     "subreddit",
+    "id",
+    "parent_id",
 ]
 
 USER_DTYPES = {
