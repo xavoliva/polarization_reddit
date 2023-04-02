@@ -3,6 +3,7 @@ Pre-processing utils
 """
 
 from typing import List, Union
+import os
 
 import networkx as nx
 import pandas as pd
@@ -73,6 +74,7 @@ def load_comments(
     # Load comments in chunks
     if engine == "pandas":
         for i, year in enumerate(years):
+            print(year)
             comments = []
             comments_folder = f"{DATA_DIR}/comments/comments_{year}"
 
@@ -80,17 +82,21 @@ def load_comments(
                 start_month if i == 0 else 1,
                 stop_month + 1 if i == len(years) - 1 else 12 + 1,
             )
-
             for month in tqdm(months, desc="Months"):
                 comments_file_name = (
                     f"{comments_folder}/comments_{year}-{month:02}.json"
                 )
+                compression = None
+                # if file does not exist
+                if not os.path.exists(comments_file_name):
+                    comments_file_name = comments_file_name.replace("json", "bz2")
+                    compression = "bz2"
+
                 comments_month = pd.read_json(
                     comments_file_name,
-                    # compression="bz2",
+                    compression=compression,
                     orient="records",
                     lines=True,
-                    use_nullable_dtypes=True,
                     dtype=COMMENT_DTYPES,
                     # chunksize=1e4,
                 )
@@ -101,11 +107,15 @@ def load_comments(
                     & (comments_month.language == "en")
                 ][COMMENT_COLUMNS]
 
+                comments_month["created_utc"] = comments_month["created_utc"].astype(
+                    "int64"
+                )
+
                 comments.append(comments_month)
 
-            df_comments = pd.concat(comments, ignore_index=True)
+        df_comments = pd.concat(comments, ignore_index=True)
 
-            return df_comments
+        return df_comments
 
     elif engine == "polars":
         queries = []
@@ -120,7 +130,9 @@ def load_comments(
                 comments_file_name = (
                     f"{comments_folder}/comments_{year}-{month:02}.json"
                 )
+
                 q = pl.scan_ndjson(comments_file_name)
+
                 queries.append(q)
 
         df_list = pl.collect_all(queries)
@@ -174,24 +186,11 @@ def load_users(engine) -> pd.DataFrame:
         return df_pl.to_pandas().astype(USER_DTYPES)[USER_COLUMNS]
 
 
-def load_user_party(year: int) -> pd.DataFrame:
-    """Load user party affiliation
-
-    Returns:
-        pd.DataFrame: user-party dataframe
-    """
-    user_party = pd.read_parquet(
-        f"{OUTPUT_DIR}/user_party_{year}.parquet",
-    )
-
-    return user_party
-
-
 def load_subreddits() -> pd.DataFrame:
-    """Load all users
+    """Load all subreddits
 
     Returns:
-        pd.DataFrame: user dataframe
+        pd.DataFrame: subreddit dataframe
     """
     subreddits = pd.read_json(
         f"{DATA_DIR}/metadata/subreddits_metadata.json",

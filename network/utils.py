@@ -3,7 +3,12 @@ import matplotlib.pyplot as plt
 
 
 def filter_node(
-    node, network, party_subreddits, opposition_subreddits, weighted, threshold=50
+    node,
+    network,
+    party_subreddits,
+    opposition_subreddits,
+    weighted,
+    threshold=None,
 ):
     if node in party_subreddits:
         return True
@@ -28,7 +33,7 @@ def filter_node(
     return False
 
 
-def draw_network(network, weighted, year, threshold=20):
+def draw_network(network, weighted, threshold=None):
 
     pos = nx.spring_layout(network, seed=7)
 

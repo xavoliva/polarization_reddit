@@ -5,7 +5,7 @@ import os
 
 DATA_DIR = f"{os.getcwd()}/data"
 
-COMMENT_DTYPES = {
+COMMENT_DTYPES_PYARROW = {
     "author": "string[pyarrow]",
     "body": "string[pyarrow]",
     "body_cleaned": "string[pyarrow]",
@@ -24,6 +24,25 @@ COMMENT_DTYPES = {
     "subreddit_id": "string[pyarrow]",
 }
 
+COMMENT_DTYPES = {
+    "author": "string",
+    "body": "string",
+    "body_cleaned": "string",
+    "controversiality": "bool",
+    "created_utc": "int64",
+    "distinguished": "bool",
+    "edited": "bool",
+    "gilded": "bool",
+    "id": "string",
+    "language": "string",
+    "link_id": "string",
+    "parent_id": "string",
+    "retrieved_on": "int64",
+    "score": "int",
+    "subreddit": "string",
+    "subreddit_id": "string",
+}
+
 ALL_COMMENT_COLUMNS = COMMENT_DTYPES.keys()
 
 COMMENT_COLUMNS = [
@@ -35,7 +54,7 @@ COMMENT_COLUMNS = [
     "parent_id",
 ]
 
-USER_DTYPES = {
+USER_DTYPES_PYARROW = {
     "author": "string[pyarrow]",
     "automoderator": "bool[pyarrow]",
     "bot": "bool[pyarrow]",
@@ -48,6 +67,21 @@ USER_DTYPES = {
     "military": "bool[pyarrow]",
     "nobility": "bool[pyarrow]",
     "trump": "bool[pyarrow]",
+}
+
+USER_DTYPES = {
+    "author": "string",
+    "automoderator": "bool",
+    "bot": "bool",
+    "gender": "string",
+    "angry": "bool",
+    "anti": "bool",
+    "astro": "bool",
+    "dangerous": "bool",
+    "doom": "bool",
+    "military": "bool",
+    "nobility": "bool",
+    "trump": "bool",
 }
 
 ALL_USER_COLUMNS = USER_DTYPES.keys()
@@ -65,7 +99,7 @@ USER_COLUMNS = [
     "trump",
 ]
 
-SUBREDDIT_DTYPES = {
+SUBREDDIT_DTYPES_PYARROW = {
     "subreddit": "string[pyarrow]",
     "banned": "bool[pyarrow]",
     "gun": "bool[pyarrow]",
@@ -75,12 +109,16 @@ SUBREDDIT_DTYPES = {
     "region": "string[pyarrow]",
 }
 
-ALL_SUBREDDIT_COLUMNS = SUBREDDIT_DTYPES.keys()
+SUBREDDIT_DTYPES = {
+    "subreddit": "string",
+    "banned": "bool",
+    "gun": "bool",
+    "meta": "bool",
+    "party": "string",
+    "politician": "bool",
+    "region": "string",
+}
 
-CEN_SUBREDDITS = [
-    "worldnews",
-    "politics",
-    "news",
-]
+ALL_SUBREDDIT_COLUMNS = SUBREDDIT_DTYPES.keys()
 
 SEED = 42
