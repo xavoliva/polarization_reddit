@@ -18,15 +18,7 @@ sno = LancasterStemmer()
 
 def get_event_regex(general_keywords, event_keywords, operator):
     if operator == "or":
-        # regex = "|".join(
-        #     [
-        #         sno.stem(word)
-        #         for keyword in (general_keywords + event_keywords)
-        #         for word in keyword.split()
-        #     ]
-        # )
-
-        regex = ""
+        regex = r""
 
         for keyword in general_keywords + event_keywords:
             if " " in keyword:
@@ -37,7 +29,7 @@ def get_event_regex(general_keywords, event_keywords, operator):
         regex = regex[:-1]
 
     elif operator == "and":
-        regex = "("
+        regex = r"(?:"
 
         for keyword in general_keywords:
             if " " in keyword:
@@ -45,7 +37,7 @@ def get_event_regex(general_keywords, event_keywords, operator):
             else:
                 regex += f"{sno.stem(keyword)}|"
 
-        regex = regex[:-1] + ")&("
+        regex = regex[:-1] + ").*(?:"
 
         for keyword in event_keywords:
             if " " in keyword:

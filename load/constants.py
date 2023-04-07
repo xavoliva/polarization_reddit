@@ -47,6 +47,7 @@ ALL_COMMENT_COLUMNS = COMMENT_DTYPES.keys()
 
 COMMENT_COLUMNS = [
     "author",
+    "body",
     "body_cleaned",
     "created_utc",
     "subreddit",
