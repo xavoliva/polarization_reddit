@@ -131,6 +131,10 @@ dmypy.json
 # Mac OS
 .DS_Store
 
+# VS Code
+.vscode/
+
 # Project
 /politosphere
 /data
+/*.py
