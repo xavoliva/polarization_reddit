@@ -8,7 +8,7 @@ from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
 import pandas as pd
 import polars as pl
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, spmatrix
 from sklearn.feature_extraction.text import CountVectorizer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -70,23 +70,24 @@ def tokenize_comment(comment: str, stemmer: bool = True) -> str:
     return " ".join(tokens)
 
 
-def load_event_comments(event_name: str, backend: str = "pandas") -> pd.DataFrame:
+def load_event_comments(event_name: str, engine: str = "pandas") -> pd.DataFrame:
     """
     Load dataframe from event
     """
     comments_file = f"{EVENTS_DIR}/{event_name}_comments.parquet"
 
-    if backend == "pandas":
+    if engine == "pandas":
         event_comments = pd.read_parquet(
             comments_file,
             engine="pyarrow",
         )
-    elif backend == "polars":
+    elif engine == "polars":
         event_comments = pl.read_parquet(
             comments_file,
-        )
+        ).to_pandas()
+
     else:
-        raise NotImplementedError(f"Backend {backend} not implemented.")
+        raise ValueError(f"Engine {engine} not supported")
 
     return event_comments
 
@@ -132,10 +133,18 @@ def calculate_user_party(user_comments: pd.DataFrame) -> pd.Series:
     user_party["rep_cnt"] = rep_cnt
     user_party["score"] = score
 
-    if score > 0:
+    if dem_cnt == 0 and rep_cnt == 0:
+        user_party["party"] = ""
+        return pd.Series(user_party)
+
+    if dem_cnt > 0 and rep_cnt == 0:
         user_party["party"] = "dem"
-    elif score < 0:
+    elif rep_cnt > 0 and dem_cnt == 0:
         user_party["party"] = "rep"
+    elif score > 0:
+        user_party["party"] = "mostly_dem"
+    elif score < 0:
+        user_party["party"] = "mostly_rep"
     else:
         user_party["party"] = ""
 
@@ -152,7 +161,7 @@ def build_vocab(corpus: pd.Series, min_comment_freq: int) -> Dict[str, int]:
     return vec.vocabulary_
 
 
-def build_term_vector(corpus: pd.Series, vocabulary) -> csr_matrix:
+def build_term_vector(corpus: pd.Series, vocabulary) -> spmatrix:
     vec = CountVectorizer(
         analyzer="word",
         ngram_range=(1, 2),

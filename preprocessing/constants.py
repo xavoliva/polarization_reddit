@@ -47,6 +47,8 @@ def get_event_regex(general_keywords, event_keywords, operator):
 
         regex = regex[:-1] + ")"
 
+    else:
+        raise ValueError("Operator must be 'or' or 'and'")
 
     return regex
 
@@ -58,19 +60,16 @@ ELECTIONS_KEYWORDS = [
     "president",
     "candidate",
     "nominee",
-    "democrat",
-    "republican",
+    # "democrat",
+    # "republican",
     "election",
     "ballot",
     "swing state",
-    "swing district",
-    "swing county",
-    "swing voter",
-    "poll",
-    "primaries",
+    # "election poll",
+    # "primaries",
     "campaign",
-    "midterm",
-    "governor",
+    # "midterm",
+    # "governor",
 ]
 
 ELECTIONS_EVENTS_INFO = {

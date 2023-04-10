@@ -58,7 +58,7 @@ def load_comments(
     start_month: int = 1,
     stop_month: int = 12,
     engine="pandas",
-):
+) -> pd.DataFrame:
     """Load all comments in a given year
     Args:
         year (int): year
@@ -73,9 +73,9 @@ def load_comments(
 
     # Load comments in chunks
     if engine == "pandas":
+        comments = []
         for i, year in enumerate(years):
             print(year)
-            comments = []
             comments_folder = f"{DATA_DIR}/comments/comments_{year}"
 
             months = range(
@@ -148,16 +148,17 @@ def load_comments(
             ]
         )
 
-        return df_pl
+        return df_pl.to_pandas().astype(
+            {
+                "author": "string[pyarrow]",
+                "body_cleaned": "string[pyarrow]",
+                "created_utc": "int64[pyarrow]",
+                "subreddit": "string[pyarrow]",
+            }
+        )
 
-        # return df_pl.to_pandas().astype(
-        #     {
-        #         "author": "string[pyarrow]",
-        #         "body_cleaned": "string[pyarrow]",
-        #         "created_utc": "int64[pyarrow]",
-        #         "subreddit": "string[pyarrow]",
-        #     }
-        # )
+    else :
+        raise ValueError("Engine not supported")
 
 
 def load_users(engine) -> pd.DataFrame:
@@ -185,6 +186,8 @@ def load_users(engine) -> pd.DataFrame:
 
         return df_pl.to_pandas().astype(USER_DTYPES)[USER_COLUMNS]
 
+    else:
+        raise ValueError("Engine not supported")
 
 def load_subreddits() -> pd.DataFrame:
     """Load all subreddits
