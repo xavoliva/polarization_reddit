@@ -97,7 +97,7 @@ def load_comments(
                     compression=compression,
                     orient="records",
                     lines=True,
-                    dtype=COMMENT_DTYPES,
+                    dtype=COMMENT_DTYPES,  # type: ignore
                     # chunksize=1e4,
                 )
 
@@ -157,7 +157,7 @@ def load_comments(
             }
         )
 
-    else :
+    else:
         raise ValueError("Engine not supported")
 
 
@@ -174,7 +174,7 @@ def load_users(engine) -> pd.DataFrame:
             orient="records",
             lines=True,
             dtype_backend="pyarrow",
-            dtype=USER_DTYPES,
+            dtype=USER_DTYPES,  # type: ignore
         )
         df = df[~(df.bot) & ~(df.automoderator)]
         return df[USER_COLUMNS]
@@ -189,6 +189,7 @@ def load_users(engine) -> pd.DataFrame:
     else:
         raise ValueError("Engine not supported")
 
+
 def load_subreddits() -> pd.DataFrame:
     """Load all subreddits
 
@@ -199,7 +200,7 @@ def load_subreddits() -> pd.DataFrame:
         f"{DATA_DIR}/metadata/subreddits_metadata.json",
         orient="records",
         lines=True,
-        dtype=SUBREDDIT_DTYPES,
+        dtype=SUBREDDIT_DTYPES,  # type: ignore
     )
 
     # Filter out regional and international subreddits

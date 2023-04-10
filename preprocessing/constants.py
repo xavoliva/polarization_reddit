@@ -1,7 +1,10 @@
 """
 Pre-processing constants
 """
+from typing import List
+
 import pandas as pd
+
 
 from load.constants import DATA_DIR
 
@@ -153,7 +156,7 @@ ELECTIONS_EVENTS_INFO = {
 }
 
 
-ELECTION_EVENTS = ELECTIONS_EVENTS_INFO.keys()
+ELECTION_EVENTS = list(ELECTIONS_EVENTS_INFO)
 
 # MASS SHOOTINGS
 

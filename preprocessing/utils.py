@@ -8,7 +8,7 @@ from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
 import pandas as pd
 import polars as pl
-from scipy.sparse import csr_matrix, spmatrix
+from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -43,6 +43,8 @@ def split_by_party(comments, backend="pandas") -> Tuple[pd.DataFrame, pd.DataFra
             partisan_comments,
             key=lambda x: x[0],
         )
+    else:
+        raise ValueError(f"Backend {backend} not supported")
 
     return (
         dem_comments[1],
@@ -161,11 +163,11 @@ def build_vocab(corpus: pd.Series, min_comment_freq: int) -> Dict[str, int]:
     return vec.vocabulary_
 
 
-def build_term_vector(corpus: pd.Series, vocabulary) -> spmatrix:
+def build_term_vector(corpus: pd.Series, vocabulary) -> csr_matrix:
     vec = CountVectorizer(
         analyzer="word",
         ngram_range=(1, 2),
         vocabulary=vocabulary,
     )
-    doc_term_vec = vec.transform([corpus.str.cat(sep=" ")])
+    doc_term_vec : csr_matrix = vec.transform([corpus.str.cat(sep=" ")]) # type: ignore
     return doc_term_vec

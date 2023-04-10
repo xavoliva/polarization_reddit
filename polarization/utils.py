@@ -2,7 +2,7 @@
 Polarization utils
 """
 # import logging
-from typing import Dict
+from typing import Dict, Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -47,7 +47,7 @@ def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
 def calculate_leaveout_polarization(
     dem_user_term_matrix: sp.csr_matrix,
     rep_user_term_matrix: sp.csr_matrix,
-):
+) -> Tuple[float, List[float], List[float]]:
     dem_user_term_cnt = dem_user_term_matrix.sum(axis=1).A1
     rep_user_term_cnt = rep_user_term_matrix.sum(axis=1).A1
 
@@ -89,7 +89,7 @@ def calculate_leaveout_polarization(
     dem_user_polarizations = []
 
     for i in tqdm(range(nr_dem_users), desc="Democrat polarization"):
-        dem_user_term_vec = dem_user_term_matrix[i].todense().A1
+        dem_user_term_vec = dem_user_term_matrix[i].todense().A1  # type: ignore
         dem_leaveout_q = get_party_q(
             dem_term_cnt_vec,
             dem_total_token_cnt,
@@ -98,7 +98,7 @@ def calculate_leaveout_polarization(
         )
         dem_token_scores = get_rho(dem_leaveout_q, rep_q)
 
-        dem_user_term_freq_vec = dem_user_term_freq_matrix[i].todense().A1
+        dem_user_term_freq_vec = dem_user_term_freq_matrix[i].todense().A1  # type: ignore
 
         dem_user_polarization = dem_user_term_freq_vec.dot(dem_token_scores)
 
@@ -108,7 +108,7 @@ def calculate_leaveout_polarization(
     rep_user_polarizations = []
 
     for j in tqdm(range(nr_rep_users), desc="Republican polarization"):
-        rep_user_term_vec = rep_user_term_matrix[j].todense().A1
+        rep_user_term_vec = rep_user_term_matrix[j].todense().A1  # type: ignore
         rep_leaveout_q = get_party_q(
             rep_term_cnt_vec,
             rep_total_token_cnt,
@@ -122,22 +122,22 @@ def calculate_leaveout_polarization(
         rep_user_polarization = rep_user_term_freq_vec.dot(rep_token_scores)
         rep_user_polarizations.append(rep_user_polarization)
 
-    dem_total_polarization = np.mean(dem_user_polarizations)
-    rep_total_polarization = np.mean(rep_user_polarizations)
+    dem_total_polarization = np.mean(dem_user_polarizations).item()
+    rep_total_polarization = np.mean(rep_user_polarizations).item()
 
     total_pol = 0.5 * (dem_total_polarization + rep_total_polarization)
 
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def build_user_term_matrix(comments, vocab: Dict[str, int]):
+def build_user_term_matrix(comments, vocab: Dict[str, int]) -> sp.csr_matrix:
     user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
 
     vec = CountVectorizer(
         analyzer="word", ngram_range=(1, 2), min_df=1, vocabulary=vocab
     )
 
-    user_matrix = vec.transform(user_tokens["tokens"])
+    user_matrix: sp.csr_matrix = vec.transform(user_tokens["tokens"])  # type: ignore
 
     return user_matrix
 
@@ -208,7 +208,7 @@ def calculate_polarization(
     comments: pd.DataFrame,
     vocab: Dict[str, int],
     method: str = "leaveout",
-):
+) -> Tuple[Tuple[float, float, int], Tuple[List[float], List[float]]]:
     """
     Measure polarization.
     event: name of the event
@@ -226,17 +226,26 @@ def calculate_polarization(
     word_ind = (
         sp.vstack([dem_user_term_matrix, rep_user_term_matrix]).getnnz(axis=0) > 1
     )
-    dem_user_term_matrix = dem_user_term_matrix[:, word_ind]
-    rep_user_term_matrix = rep_user_term_matrix[:, word_ind]
+    dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[:, word_ind]  # type: ignore
+    rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[:, word_ind]  # type: ignore
 
     # filter out users who did not use words from vocab
-    dem_user_term_matrix = dem_user_term_matrix[dem_user_term_matrix.getnnz(axis=1) > 0]
-    rep_user_term_matrix = rep_user_term_matrix[rep_user_term_matrix.getnnz(axis=1) > 0]
+    dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[
+        dem_user_term_matrix.getnnz(axis=1) > 0
+    ]  # type: ignore
+    rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[
+        rep_user_term_matrix.getnnz(axis=1) > 0
+    ]  # type: ignore
 
-    user_term_matrix = sp.vstack([dem_user_term_matrix, rep_user_term_matrix])
+    user_term_matrix: sp.csr_matrix = sp.vstack(
+        [
+            dem_user_term_matrix,
+            rep_user_term_matrix,
+        ]
+    )  # type: ignore
 
-    dem_user_cnt = dem_user_term_matrix.shape[0]
-    rep_user_cnt = rep_user_term_matrix.shape[0]
+    dem_user_cnt: int = dem_user_term_matrix.shape[0]
+    rep_user_cnt: int = rep_user_term_matrix.shape[0]
 
     if dem_user_cnt < 10 or rep_user_cnt < 10:
         # return these values when there is not enough data to make predictions on
@@ -252,11 +261,11 @@ def calculate_polarization(
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:
         random_ind = RNG.choice(dem_user_cnt, replace=False, size=rep_user_cnt)
-        dem_user_term_matrix = dem_user_term_matrix[random_ind]
+        dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[random_ind]  # type: ignore
 
     elif rep_user_cnt > dem_user_cnt:
         random_ind = RNG.choice(rep_user_cnt, replace=False, size=dem_user_cnt)
-        rep_user_term_matrix = rep_user_term_matrix[random_ind]
+        rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[random_ind]  # type: ignore
 
     assert dem_user_term_matrix.shape[0] == rep_user_term_matrix.shape[0]
 
@@ -277,15 +286,25 @@ def calculate_polarization(
 
         shuffled_user_ind = RNG.choice(user_cnt, replace=False, size=user_cnt)
 
+        random_users_dem: sp.csr_matrix = user_term_matrix[
+            shuffled_user_ind[: int(user_cnt / 2)]
+        ]  # type: ignore
+        random_users_rep: sp.csr_matrix = user_term_matrix[
+            shuffled_user_ind[int(user_cnt / 2) :]
+        ]  # type: ignore
+
         random_polarization, _, _ = calculate_leaveout_polarization(
-            user_term_matrix[shuffled_user_ind[: int(user_cnt / 2)]],
-            user_term_matrix[shuffled_user_ind[int(user_cnt / 2) :]],
+            random_users_dem,
+            random_users_rep,
         )
 
         return (total_polarization, random_polarization, user_cnt), (
             dem_user_polarizations,
             rep_user_polarizations,
         )
+
+    else:
+        raise ValueError(f"Method {method} not recognized")
 
 
 def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
