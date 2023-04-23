@@ -31,8 +31,8 @@ def get_party_q(
     return term_cnt_vec / total_token_cnt
 
 
-def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
-    denom = dem_q + rep_q
+def get_rho(q_1: np.ndarray, q_2: np.ndarray) -> np.ndarray:
+    denom = q_1 + q_2
 
     # nr_zero_values_denominator = np.count_nonzero(denom == 0)
 
@@ -41,7 +41,7 @@ def get_rho(dem_q: np.ndarray, rep_q: np.ndarray) -> np.ndarray:
     #         f"A lot of values in the denominator are zero: {nr_zero_values_denominator}"
     #     )
 
-    return np.divide(dem_q, denom, out=np.zeros_like(dem_q), where=dem_q + rep_q != 0)
+    return np.divide(q_1, denom, out=np.zeros_like(q_1), where=denom != 0)
 
 
 def calculate_leaveout_polarization(
@@ -85,7 +85,7 @@ def calculate_leaveout_polarization(
         rep_total_token_cnt,
     )
 
-    # Republican polarization
+    # Democrat polarization
     dem_user_polarizations = []
 
     for i in tqdm(range(nr_dem_users), desc="Democrat polarization"):
@@ -115,7 +115,7 @@ def calculate_leaveout_polarization(
             rep_user_term_vec,
             rep_users_term_cnt_vec[j],
         )
-        rep_token_scores = 1.0 - get_rho(dem_q, rep_leaveout_q)
+        rep_token_scores = get_rho(rep_leaveout_q, dem_q)
 
         rep_user_term_freq_vec = rep_user_term_freq_matrix[j].todense().A1
 
