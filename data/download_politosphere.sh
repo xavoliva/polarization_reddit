@@ -9,10 +9,10 @@ then
 
     echo "Download comments"
 
-    mkdir -p $SCRIPT_DIR/comments/comments_$YEAR
+    mkdir -p $SCRIPT_DIR/comments/
     for month in {01..12}
     do
-        curl https://zenodo.org/record/5851729/files/comments_$YEAR-$month.bz2?download=1 -o $SCRIPT_DIR/comments/comments_$YEAR/comments_$YEAR-$month.bz2
+        curl https://zenodo.org/record/5851729/files/comments_$YEAR-$month.bz2?download=1 -o $SCRIPT_DIR/comments/comments_$YEAR-$month.bz2
     done
 
     echo "Download networks"

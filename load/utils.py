@@ -76,7 +76,7 @@ def load_comments(
         comments = []
         for i, year in enumerate(years):
             print(year)
-            comments_folder = f"{DATA_DIR}/comments/comments_{year}"
+            comments_folder = f"{DATA_DIR}/comments"
 
             months = range(
                 start_month if i == 0 else 1,
@@ -102,7 +102,8 @@ def load_comments(
                 )
 
                 comments_month = comments_month[
-                    (comments_month.body != "[deleted]")
+                    (comments_month.body_cleaned.notnull())
+                    & (comments_month.body != "[deleted]")
                     & (comments_month.author != "[deleted]")
                     & (comments_month.language == "en")
                 ][COMMENT_COLUMNS]
@@ -120,7 +121,7 @@ def load_comments(
     elif engine == "polars":
         queries = []
         for i, year in enumerate(years):
-            comments_folder = f"{DATA_DIR}/comments/comments_{year}"
+            comments_folder = f"{DATA_DIR}/comments"
             months = range(
                 start_month if i == 0 else 1,
                 stop_month + 1 if i == len(years) - 1 else 12 + 1,
