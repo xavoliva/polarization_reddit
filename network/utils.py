@@ -1,5 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
 
 
 def filter_node(
@@ -35,7 +36,9 @@ def filter_node(
 
 def draw_network(network, weighted, threshold=None):
 
-    pos = nx.spring_layout(network, seed=7)
+    pos = nx.spring_layout(network, k=10/math.sqrt(network.order()), seed=7)
+
+    pos = nx.nx_pydot.graphviz_layout(network)
 
     # nodes
     nx.draw_networkx_nodes(network, pos, node_size=50)
