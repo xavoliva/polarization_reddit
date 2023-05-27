@@ -237,6 +237,13 @@ def calculate_polarization(
         rep_user_term_matrix.getnnz(axis=1) > 0
     ]  # type: ignore
 
+    (
+        dem_user_term_matrix,
+        rep_user_term_matrix,
+    ) = get_balanced_partisan_user_term_matrices(
+        dem_user_term_matrix, rep_user_term_matrix
+    )
+
     user_term_matrix: sp.csr_matrix = sp.vstack(
         [
             dem_user_term_matrix,
@@ -244,6 +251,41 @@ def calculate_polarization(
         ]
     )  # type: ignore
 
+    user_cnt = user_term_matrix.shape[0]
+
+    if method == "leaveout":
+        print("Calculate leave-out polarization of users")
+        (
+            total_polarization,
+            dem_user_polarizations,
+            rep_user_polarizations,
+        ) = calculate_leaveout_polarization(
+            dem_user_term_matrix,
+            rep_user_term_matrix,
+        )
+
+        print("Calculate leave-out polarization with random assignment of users")
+
+        random_users_dem, random_users_rep = random_shuffle_users(user_term_matrix)
+
+        random_polarization, _, _ = calculate_leaveout_polarization(
+            random_users_dem,
+            random_users_rep,
+        )
+
+        return (total_polarization, random_polarization, user_cnt), (
+            dem_user_polarizations,
+            rep_user_polarizations,
+        )
+
+    else:
+        raise ValueError(f"Method {method} not recognized")
+
+
+def get_balanced_partisan_user_term_matrices(
+    dem_user_term_matrix: sp.csr_matrix,
+    rep_user_term_matrix: sp.csr_matrix,
+):
     dem_user_cnt: int = dem_user_term_matrix.shape[0]
     rep_user_cnt: int = rep_user_term_matrix.shape[0]
 
@@ -261,50 +303,35 @@ def calculate_polarization(
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:
         random_ind = RNG.choice(dem_user_cnt, replace=False, size=rep_user_cnt)
-        dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[random_ind]  # type: ignore
+        sample_dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[random_ind]  # type: ignore
 
     elif rep_user_cnt > dem_user_cnt:
         random_ind = RNG.choice(rep_user_cnt, replace=False, size=dem_user_cnt)
-        rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[random_ind]  # type: ignore
-
-    assert dem_user_term_matrix.shape[0] == rep_user_term_matrix.shape[0]
-
-    user_cnt = dem_user_term_matrix.shape[0] + rep_user_term_matrix.shape[0]
-
-    if method == "leaveout":
-        print("Calculate leave-out polarization of users")
-        (
-            total_polarization,
-            dem_user_polarizations,
-            rep_user_polarizations,
-        ) = calculate_leaveout_polarization(
-            dem_user_term_matrix,
-            rep_user_term_matrix,
-        )
-
-        print("Calculate leave-out polarization with random assignment of users")
-
-        shuffled_user_ind = RNG.choice(user_cnt, replace=False, size=user_cnt)
-
-        random_users_dem: sp.csr_matrix = user_term_matrix[
-            shuffled_user_ind[: int(user_cnt / 2)]
-        ]  # type: ignore
-        random_users_rep: sp.csr_matrix = user_term_matrix[
-            shuffled_user_ind[int(user_cnt / 2) :]
-        ]  # type: ignore
-
-        random_polarization, _, _ = calculate_leaveout_polarization(
-            random_users_dem,
-            random_users_rep,
-        )
-
-        return (total_polarization, random_polarization, user_cnt), (
-            dem_user_polarizations,
-            rep_user_polarizations,
-        )
-
+        sample_rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[random_ind]  # type: ignore
     else:
-        raise ValueError(f"Method {method} not recognized")
+        sample_dem_user_term_matrix = dem_user_term_matrix
+        sample_rep_user_term_matrix = rep_user_term_matrix
+
+    assert sample_dem_user_term_matrix.shape[0] == sample_rep_user_term_matrix.shape[0]  # type: ignore
+
+    return sample_dem_user_term_matrix, sample_rep_user_term_matrix  # type: ignore
+
+
+def random_shuffle_users(user_term_matrix: sp.csr_matrix):
+    RNG = np.random.default_rng(SEED)
+
+    user_cnt: int = user_term_matrix.shape[0]
+
+    shuffled_user_ind = RNG.choice(user_cnt, replace=False, size=user_cnt)
+
+    random_users_dem: sp.csr_matrix = user_term_matrix[
+        shuffled_user_ind[: int(user_cnt / 2)]
+    ]  # type: ignore
+    random_users_rep: sp.csr_matrix = user_term_matrix[
+        shuffled_user_ind[int(user_cnt / 2) :]
+    ]  # type: ignore
+
+    return random_users_dem, random_users_rep
 
 
 def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
