@@ -7,7 +7,7 @@ def logodds_with_prior(
     term_vec,
     dem_term_vec,
     rep_term_vec,
-) -> np.array:
+):
     """
     Weighted log odds ratio, as defined in
     https://bookdown.org/Maxine/tidy-text-mining/weighted-log-odds-ratio.html

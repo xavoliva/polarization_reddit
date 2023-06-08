@@ -124,11 +124,11 @@ def get_sentiment_score(comment: str) -> float:
     return sia.polarity_scores(comment)["compound"]
 
 
-def calculate_user_party(user_comments: pd.DataFrame) -> pd.Series:
+def calculate_user_party(partisan_comments: pd.DataFrame) -> pd.Series:
     user_party = {}
 
-    dem_cnt = len(user_comments[user_comments["party"] == "dem"])
-    rep_cnt = len(user_comments[user_comments["party"] == "rep"])
+    dem_cnt = len(partisan_comments[partisan_comments["party"] == "dem"])
+    rep_cnt = len(partisan_comments[partisan_comments["party"] == "rep"])
     score = dem_cnt - rep_cnt
 
     user_party["dem_cnt"] = dem_cnt
@@ -153,11 +153,13 @@ def calculate_user_party(user_comments: pd.DataFrame) -> pd.Series:
     return pd.Series(user_party)
 
 
-def build_vocab(corpus: pd.Series, min_comment_freq: int) -> Dict[str, int]:
+def build_vocab(
+    corpus: pd.Series, ngram_range: Tuple[int, int], min_df: int
+) -> Dict[str, int]:
     vec = CountVectorizer(
         analyzer="word",
-        ngram_range=(1, 2),
-        min_df=min_comment_freq,
+        ngram_range=ngram_range,
+        min_df=min_df,
     )
     vec.fit(corpus)
     return vec.vocabulary_
@@ -169,5 +171,5 @@ def build_term_vector(corpus: pd.Series, vocabulary) -> csr_matrix:
         ngram_range=(1, 2),
         vocabulary=vocabulary,
     )
-    doc_term_vec : csr_matrix = vec.transform([corpus.str.cat(sep=" ")]) # type: ignore
+    doc_term_vec: csr_matrix = vec.transform([corpus.str.cat(sep=" ")])  # type: ignore
     return doc_term_vec

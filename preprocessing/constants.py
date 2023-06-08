@@ -12,7 +12,7 @@ EVENTS_DIR = f"{DATA_DIR}/events"
 OUTPUT_DIR = f"{DATA_DIR}/output"
 METADATA_DIR = f"{DATA_DIR}/metadata"
 
-MIN_OCCURENCE_FOR_VOCAB = 25
+MIN_OCCURENCE_FOR_VOCAB = 50
 
 from nltk.stem.lancaster import LancasterStemmer
 
@@ -21,34 +21,34 @@ sno = LancasterStemmer()
 
 def get_event_regex(general_keywords, event_keywords, operator):
     if operator == "or":
-        regex = r""
+        regex = r"\b(?:"
 
         for keyword in general_keywords + event_keywords:
             if " " in keyword:
-                regex += f"{' '.join([sno.stem(word) for word in keyword.split()])}|"
+                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
             else:
-                regex += f"{sno.stem(keyword)}|"
+                regex += rf"{sno.stem(keyword)}|"
 
-        regex = regex[:-1]
+        regex = regex[:-1] + r")\b"
 
     elif operator == "and":
-        regex = r"(?:"
+        regex = r"\b(?:"
 
         for keyword in general_keywords:
             if " " in keyword:
-                regex += f"{' '.join([sno.stem(word) for word in keyword.split()])}|"
+                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
             else:
-                regex += f"{sno.stem(keyword)}|"
+                regex += rf"{sno.stem(keyword)}|"
 
-        regex = regex[:-1] + ").*(?:"
+        regex = rf"{regex[:-1]})\b.*\b(?:"
 
         for keyword in event_keywords:
             if " " in keyword:
-                regex += f"{' '.join([sno.stem(word) for word in keyword.split()])}|"
+                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
             else:
-                regex += f"{sno.stem(keyword)}|"
+                regex += rf"{sno.stem(keyword)}|"
 
-        regex = regex[:-1] + ")"
+        regex = rf"{regex[:-1]})\b"
 
     else:
         raise ValueError("Operator must be 'or' or 'and'")

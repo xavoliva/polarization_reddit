@@ -6,11 +6,18 @@ import math
 def filter_node(
     node,
     network,
+    eligible_subreddits,
     party_subreddits,
     opposition_subreddits,
     weighted,
     threshold=None,
 ):
+    if eligible_subreddits is not None and node not in eligible_subreddits:
+        return False
+
+    if node in opposition_subreddits:
+        return False
+
     if node in party_subreddits:
         return True
 

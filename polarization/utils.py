@@ -1,47 +1,42 @@
 """
 Polarization utils
 """
-# import logging
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from scipy import stats
-from scipy.optimize import minimize
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 
-from preprocessing.utils import split_by_party
+from preprocessing.utils import split_by_party, build_vocab
 from load.constants import SEED
 
 
 def get_party_q(
-    term_cnt_vec,
-    total_token_cnt,
-    excluded_user_term_cnt_vec=None,
-    excluded_user_token_cnt=None,
+    term_cnt_vec: np.ndarray,
+    total_token_cnt: int,
+    excluded_user_term_cnt_vec: Optional[np.ndarray] = None,
+    excluded_user_token_cnt: Optional[int] = None,
 ) -> np.ndarray:
-    if not excluded_user_term_cnt_vec is None:
+    if excluded_user_term_cnt_vec is not None and excluded_user_token_cnt is not None:
         leaveout_term_cnt_vec = term_cnt_vec - excluded_user_term_cnt_vec
         leaveout_total_token_cnt = total_token_cnt - excluded_user_token_cnt
 
-        return leaveout_term_cnt_vec / leaveout_total_token_cnt
+        return np.divide(leaveout_term_cnt_vec, leaveout_total_token_cnt)
 
-    return term_cnt_vec / total_token_cnt
+    return np.divide(term_cnt_vec, total_token_cnt)
 
 
 def get_rho(q_1: np.ndarray, q_2: np.ndarray) -> np.ndarray:
     denom = q_1 + q_2
 
-    # nr_zero_values_denominator = np.count_nonzero(denom == 0)
+    nr_zero_values_denominator = np.count_nonzero(denom == 0)
 
-    # if nr_zero_values_denominator > 5:
-    #     logging.warning(
-    #         f"A lot of values in the denominator are zero: {nr_zero_values_denominator}"
-    #     )
+    if nr_zero_values_denominator > 0:
+        RuntimeError(f"{nr_zero_values_denominator} values in the denominator are zero")
 
-    return np.divide(q_1, denom, out=np.zeros_like(q_1), where=denom != 0)
+    return np.divide(q_1, denom)
 
 
 def calculate_leaveout_polarization(
@@ -130,11 +125,15 @@ def calculate_leaveout_polarization(
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def build_user_term_matrix(comments, vocab: Dict[str, int]) -> sp.csr_matrix:
-    user_tokens = comments.groupby("author", as_index=False).agg({"tokens": " ".join})
-
+def build_user_term_matrix(
+    user_tokens,
+    ngram_range,
+    vocab: Dict[str, int],
+) -> sp.csr_matrix:
     vec = CountVectorizer(
-        analyzer="word", ngram_range=(1, 2), min_df=1, vocabulary=vocab
+        analyzer="word",
+        ngram_range=ngram_range,
+        vocabulary=vocab,
     )
 
     user_matrix: sp.csr_matrix = vec.transform(user_tokens["tokens"])  # type: ignore
@@ -142,72 +141,12 @@ def build_user_term_matrix(comments, vocab: Dict[str, int]) -> sp.csr_matrix:
     return user_matrix
 
 
-def calculate_penalized_polarization():
-    nr_users = 200
-    len_vocab = 100
-    nr_features = 10
-
-    X = np.ones(shape=(nr_users, nr_features))
-    Params0 = np.ones(shape=(len_vocab * (nr_features + 2)), dtype="float32")
-
-    mi = np.ones(shape=(nr_users, 1))
-
-    cij = np.ones(shape=(nr_users, len_vocab))
-
-    is_republican = np.ones(shape=(nr_users, 1))
-
-    lambda_1 = 10e-5
-    lambda_2 = 0.3 * np.ones(shape=(len_vocab))
-
-    def penalized_mle(parameters):
-        # parameters = (len_vocab * (nr_features + 2))
-        # alpha = (len_vocab, 1)
-        # gamma = (len_vocab, nr_features)
-        # phi = (len_vocab, 1)
-        # X = (nr_users, nr_features)
-        # mi = (nr_users, 1)
-        # cij = (nr_users, len_vocab)
-        # is_republican = (nr_users, 1)
-
-        # u = (nr_users, len_vocab)
-
-        alpha = parameters[:len_vocab]
-        Gamma = parameters[len_vocab : len_vocab + len_vocab * nr_features].reshape(
-            (len_vocab, nr_features)
-        )
-        phi = parameters[-len_vocab:]
-
-        u = alpha + X @ Gamma.T + np.outer(is_republican, phi)
-
-        out = np.sum(
-            mi * np.exp(u)
-            - cij * u
-            + phi * lambda_1 * (np.abs(alpha) + np.sum(np.abs(Gamma), axis=1))
-            + lambda_2 * np.abs(phi)
-        )
-
-        return out
-
-    mle_model = minimize(
-        fun=penalized_mle,
-        x0=Params0,
-        method="L-BFGS-B",
-        options={
-            "maxiter": 100,
-            "maxcor": 1000,
-            "disp": True,
-        },
-    )
-
-    print(mle_model)
-
-    return mle_model["x"]
-
-
 def calculate_polarization(
     comments: pd.DataFrame,
-    vocab: Dict[str, int],
+    ngram_range: Tuple[int, int],
+    event_vocab: Dict[str, int],
     method: str = "leaveout",
+    equalize_users: bool = True,
 ) -> Tuple[Tuple[float, float, int], Tuple[List[float], List[float]]]:
     """
     Measure polarization.
@@ -215,43 +154,51 @@ def calculate_polarization(
     comments: dataframe with 'body_cleaned' and 'user'
     default_score: default token partisanship score
     """
-
-    # get partisan comments
-    dem_comments, rep_comments = split_by_party(comments)
-
-    dem_user_term_matrix = build_user_term_matrix(dem_comments, vocab)
-    rep_user_term_matrix = build_user_term_matrix(rep_comments, vocab)
-
-    # filter out words used by fewer than 2 people
-    word_ind = (
-        sp.vstack([dem_user_term_matrix, rep_user_term_matrix]).getnnz(axis=0) > 1
-    )
-    dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[:, word_ind]  # type: ignore
-    rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[:, word_ind]  # type: ignore
-
-    # filter out users who did not use words from vocab
-    dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[
-        dem_user_term_matrix.getnnz(axis=1) > 0
-    ]  # type: ignore
-    rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[
-        rep_user_term_matrix.getnnz(axis=1) > 0
-    ]  # type: ignore
-
-    (
-        dem_user_term_matrix,
-        rep_user_term_matrix,
-    ) = get_balanced_partisan_user_term_matrices(
-        dem_user_term_matrix, rep_user_term_matrix
+    user_tokens = comments.groupby("author", as_index=False).agg(
+        tokens=("tokens", lambda x: " ".join(x)),
+        party=("party", lambda x: x.iloc[0]),
+        nr_comments=("id", "count"),
     )
 
-    user_term_matrix: sp.csr_matrix = sp.vstack(
-        [
-            dem_user_term_matrix,
-            rep_user_term_matrix,
-        ]
-    )  # type: ignore
+    if equalize_users:
+        print("Equalize users")
+        dem_user_tokens, rep_user_tokens = split_by_party(user_tokens)
+        (
+            dem_user_tokens,
+            rep_user_tokens,
+        ) = get_balanced_partisan_user_tokens(dem_user_tokens, rep_user_tokens)
+
+        user_tokens = pd.concat([dem_user_tokens, rep_user_tokens])
+
+    user_term_matrix = build_user_term_matrix(user_tokens, ngram_range, event_vocab)
 
     user_cnt = user_term_matrix.shape[0]
+
+    # filter out words used by fewer than 2 people
+    word_ind = [
+        ind
+        for ind, is_more_than_one in enumerate(
+            user_term_matrix.getnnz(axis=0) >= 2  # type: ignore
+        )
+        if is_more_than_one
+    ]
+
+    user_term_matrix: sp.csr_matrix = user_term_matrix[:, word_ind]  # type: ignore
+
+    dem_indices = [
+        ind
+        for ind, is_dem in enumerate((user_tokens["party"] == "dem").values)
+        if is_dem
+    ]
+
+    rep_indices = [
+        ind
+        for ind, is_rep in enumerate((user_tokens["party"] == "rep").values)
+        if is_rep
+    ]
+
+    dem_user_term_matrix: sp.csr_matrix = user_term_matrix[dem_indices]  # type: ignore
+    rep_user_term_matrix: sp.csr_matrix = user_term_matrix[rep_indices]  # type: ignore
 
     if method == "leaveout":
         print("Calculate leave-out polarization of users")
@@ -282,16 +229,16 @@ def calculate_polarization(
         raise ValueError(f"Method {method} not recognized")
 
 
-def get_balanced_partisan_user_term_matrices(
-    dem_user_term_matrix: sp.csr_matrix,
-    rep_user_term_matrix: sp.csr_matrix,
-):
-    dem_user_cnt: int = dem_user_term_matrix.shape[0]
-    rep_user_cnt: int = rep_user_term_matrix.shape[0]
+def get_balanced_partisan_user_tokens(
+    dem_user_tokens: pd.DataFrame,
+    rep_user_tokens: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    dem_user_cnt: int = dem_user_tokens.shape[0]
+    rep_user_cnt: int = rep_user_tokens.shape[0]
 
     if dem_user_cnt < 10 or rep_user_cnt < 10:
         # return these values when there is not enough data to make predictions on
-        raise RuntimeError(
+        raise RuntimeWarning(
             f"""Not enough data to make predictions:
             - Number of democrat users: {dem_user_cnt}
             - Number of republican users: {rep_user_cnt}
@@ -303,18 +250,15 @@ def get_balanced_partisan_user_term_matrices(
     # make the prior neutral (i.e. make sure there are the same number of dem and rep users)
     if dem_user_cnt > rep_user_cnt:
         random_ind = RNG.choice(dem_user_cnt, replace=False, size=rep_user_cnt)
-        sample_dem_user_term_matrix: sp.csr_matrix = dem_user_term_matrix[random_ind]  # type: ignore
+        sample_dem_user_tokens = dem_user_tokens.iloc[random_ind]
+        return sample_dem_user_tokens, rep_user_tokens
 
     elif rep_user_cnt > dem_user_cnt:
         random_ind = RNG.choice(rep_user_cnt, replace=False, size=dem_user_cnt)
-        sample_rep_user_term_matrix: sp.csr_matrix = rep_user_term_matrix[random_ind]  # type: ignore
+        sample_rep_user_tokens = rep_user_tokens.iloc[random_ind]
+        return dem_user_tokens, sample_rep_user_tokens
     else:
-        sample_dem_user_term_matrix = dem_user_term_matrix
-        sample_rep_user_term_matrix = rep_user_term_matrix
-
-    assert sample_dem_user_term_matrix.shape[0] == sample_rep_user_term_matrix.shape[0]  # type: ignore
-
-    return sample_dem_user_term_matrix, sample_rep_user_term_matrix  # type: ignore
+        return dem_user_tokens, rep_user_tokens
 
 
 def random_shuffle_users(user_term_matrix: sp.csr_matrix):
@@ -334,15 +278,24 @@ def random_shuffle_users(user_term_matrix: sp.csr_matrix):
     return random_users_dem, random_users_rep
 
 
-def calculate_polarization_by_time(event_comments, event_vocab, freq="D"):
+def calculate_polarization_by_time(
+    event_comments,
+    ngram_range: Tuple[int, int],
+    event_vocab: Dict[str, int],
+    freq="D",
+    equalize_users: bool = True,
+):
     polarization = []
     for datetime, date_comments in event_comments.groupby(
         pd.Grouper(key="datetime", freq=freq)
     ):
         print(datetime)
         (total_polarization, random_polarization, user_cnt), _ = calculate_polarization(
-            date_comments,
-            event_vocab,
+            comments=date_comments,
+            ngram_range=ngram_range,
+            event_vocab=event_vocab,
+            method="leaveout",
+            equalize_users=equalize_users,
         )
         print(total_polarization)
         polarization.append(
