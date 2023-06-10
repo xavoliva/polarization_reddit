@@ -9,7 +9,7 @@ import scipy.sparse as sp
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 
-from preprocessing.utils import split_by_party, build_vocab
+from preprocessing.utils import split_by_party, build_vocab, build_term_matrix
 from load.constants import SEED
 
 
@@ -125,22 +125,6 @@ def calculate_leaveout_polarization(
     return total_pol, dem_user_polarizations, rep_user_polarizations
 
 
-def build_user_term_matrix(
-    user_tokens,
-    ngram_range,
-    vocab: Dict[str, int],
-) -> sp.csr_matrix:
-    vec = CountVectorizer(
-        analyzer="word",
-        ngram_range=ngram_range,
-        vocabulary=vocab,
-    )
-
-    user_matrix: sp.csr_matrix = vec.transform(user_tokens["tokens"])  # type: ignore
-
-    return user_matrix
-
-
 def calculate_polarization(
     comments: pd.DataFrame,
     ngram_range: Tuple[int, int],
@@ -170,7 +154,7 @@ def calculate_polarization(
 
         user_tokens = pd.concat([dem_user_tokens, rep_user_tokens])
 
-    user_term_matrix = build_user_term_matrix(user_tokens, ngram_range, event_vocab)
+    user_term_matrix = build_term_matrix(user_tokens["tokens"], ngram_range, event_vocab)
 
     user_cnt = user_term_matrix.shape[0]
 

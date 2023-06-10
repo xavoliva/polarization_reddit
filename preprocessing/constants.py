@@ -63,28 +63,13 @@ ELECTIONS_KEYWORDS = [
     "president",
     "candidate",
     "nominee",
-    # "democrat",
-    # "republican",
     "election",
     "ballot",
     "swing state",
-    # "election poll",
-    # "primaries",
     "campaign",
-    # "midterm",
-    # "governor",
 ]
 
 ELECTIONS_EVENTS_INFO = {
-    "us_elections_2008": {
-        "name": "2008 US presidential election",
-        "date": pd.to_datetime("11-04-2008"),
-        "relevant_dates": {},
-        "type": "election",
-        "regex": get_event_regex(
-            ELECTIONS_KEYWORDS, ["obama", "mccain", "biden", "palin"], "or"
-        ),
-    },
     "us_elections_2012": {
         "name": "2012 US presidential election",
         "date": pd.to_datetime("11-06-2012"),
@@ -106,7 +91,7 @@ ELECTIONS_EVENTS_INFO = {
         "date": pd.to_datetime("11-04-2014"),
         "relevant_dates": {},
         "type": "election",
-        "regex": get_event_regex(ELECTIONS_KEYWORDS, [], "or"),
+        "regex": get_event_regex(ELECTIONS_KEYWORDS, ["midterms"], "or"),
     },
     "us_elections_2016": {
         "name": "2016 US presidential election",
@@ -149,12 +134,11 @@ ELECTIONS_EVENTS_INFO = {
         "type": "election",
         "regex": get_event_regex(
             ELECTIONS_KEYWORDS,
-            [],
+            ["midterms"],
             "or",
         ),
     },
 }
-
 
 ELECTION_EVENTS = list(ELECTIONS_EVENTS_INFO)
 

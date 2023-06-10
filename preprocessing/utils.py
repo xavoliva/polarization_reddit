@@ -6,7 +6,9 @@ from typing import Dict, Tuple
 
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 import pandas as pd
+import numpy as np
 import polars as pl
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
@@ -52,18 +54,23 @@ def split_by_party(comments, backend="pandas") -> Tuple[pd.DataFrame, pd.DataFra
     )
 
 
-def tokenize_comment(comment: str, stemmer: bool = True) -> str:
+def tokenize_comment(
+    comment: str, stemmer: bool = True, filter_stopwords: bool = True
+) -> str:
     """
     Tokenize comment
 
-    Note: body_clean is lowercased, without stopwords and URLs, and without
-    character repetition
+    Note: body_clean is lowercased, without URLs, and without character repetition
     """
 
     tokens = word_tokenize(comment)
 
     # filter out punctuation
     tokens = [token for token in tokens if token.isalnum()]
+
+    if filter_stopwords:
+        stop_words = set(stopwords.words("english"))
+        tokens = [token for token in tokens if token not in stop_words]
 
     # stem words
     if stemmer:
@@ -153,9 +160,7 @@ def calculate_user_party(partisan_comments: pd.DataFrame) -> pd.Series:
     return pd.Series(user_party)
 
 
-def build_vocab(
-    corpus: pd.Series, ngram_range: Tuple[int, int], min_df: int
-) -> Dict[str, int]:
+def build_vocab(corpus, ngram_range: Tuple[int, int], min_df: int) -> Dict[str, int]:
     vec = CountVectorizer(
         analyzer="word",
         ngram_range=ngram_range,
@@ -165,11 +170,33 @@ def build_vocab(
     return vec.vocabulary_
 
 
-def build_term_vector(corpus: pd.Series, vocabulary) -> csr_matrix:
+def build_term_matrix(
+    corpus,
+    ngram_range,
+    vocab: Dict[str, int],
+) -> csr_matrix:
     vec = CountVectorizer(
         analyzer="word",
-        ngram_range=(1, 2),
-        vocabulary=vocabulary,
+        ngram_range=ngram_range,
+        vocabulary=vocab,
     )
-    doc_term_vec: csr_matrix = vec.transform([corpus.str.cat(sep=" ")])  # type: ignore
+
+    user_matrix: csr_matrix = vec.transform(corpus)  # type: ignore
+
+    return user_matrix
+
+
+def build_term_vector(
+    corpus,
+    ngram_range,
+    vocab: Dict[str, int],
+) -> np.ndarray:
+    term_matrix = build_term_matrix(corpus, ngram_range, vocab)
+
+    doc_term_vec = build_term_vector_from_matrix(term_matrix)
+
     return doc_term_vec
+
+
+def build_term_vector_from_matrix(term_matrix: csr_matrix) -> np.ndarray:
+    return term_matrix.sum(axis=0).A1  # type: ignore
