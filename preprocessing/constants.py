@@ -21,34 +21,34 @@ sno = LancasterStemmer()
 
 def get_event_regex(general_keywords, event_keywords, operator):
     if operator == "or":
-        regex = r"\b(?:"
-
+        regex_keywords_list = []
         for keyword in general_keywords + event_keywords:
-            if " " in keyword:
-                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
-            else:
-                regex += rf"{sno.stem(keyword)}|"
+            regex_keywords_list.append(
+                f"{' '.join([sno.stem(word) for word in keyword.split()])}"
+            )
 
-        regex = regex[:-1] + r")\b"
+        keywords_regex = "|".join(regex_keywords_list)
+
+        regex = rf"\b(?:{keywords_regex})\b"
 
     elif operator == "and":
-        regex = r"\b(?:"
-
+        regex_general_keywords_list = []
         for keyword in general_keywords:
-            if " " in keyword:
-                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
-            else:
-                regex += rf"{sno.stem(keyword)}|"
+            regex_general_keywords_list.append(
+                f"{' '.join([sno.stem(word) for word in keyword.split()])}"
+            )
 
-        regex = rf"{regex[:-1]})\b.*\b(?:"
+        regex_general_keywords = "|".join(regex_general_keywords_list)
 
+        regex_event_keywords_list = []
         for keyword in event_keywords:
-            if " " in keyword:
-                regex += rf"{' '.join([sno.stem(word) for word in keyword.split()])}|"
-            else:
-                regex += rf"{sno.stem(keyword)}|"
+            regex_event_keywords_list.append(
+                f"{' '.join([sno.stem(word) for word in keyword.split()])}"
+            )
 
-        regex = rf"{regex[:-1]})\b"
+        regex_event_keywords = "|".join(regex_event_keywords_list)
+
+        regex = rf"\b(?:{regex_general_keywords})\b.*\b(?:{regex_event_keywords})\b|\b(?:{regex_event_keywords})\b.*\b(?:{regex_general_keywords})\b"
 
     else:
         raise ValueError("Operator must be 'or' or 'and'")
@@ -349,7 +349,7 @@ MASS_SHOOTINGS_EVENTS_INFO = {
         "regex": get_event_regex(
             MASS_SHOOTINGS_KEYWORDS,
             [
-                "ups",
+                # "ups",
                 "san francisco",
             ],
             "and",
@@ -595,5 +595,126 @@ ABORTION_EVENTS_INFO = {
         "regex": get_event_regex(ABORTION_KEYWORDS, [], "or"),
     },
 }
+# Create a Python list of at least 50 (lowercase, but including spaces) keywords
+# with all the ways Democrats call Republicans on Reddit. Use any terms which
+# can be used neutrally, pejoratively, or respectfully. Try to avoid false
+# positives like "red".
+REPUBLICAN_KEYWORDS = [
+    "gop",
+    "conservatives",
+    "right-wingers",
+    "republicans",
+    "right-leaning",
+    "elephants",
+    "righties",
+    "rightists",
+    "red states",
+    "the grand old party",
+    "rinos",
+    "neocons",
+    "tea partiers",
+    "trumpists",
+    "trump supporters",
+    "right-wing extremists",
+    "reactionaries",
+    "right-wing populists",
+    "authoritarians",
+    "the religious right",
+    "the conservative base",
+    "the establishment",
+    "the right-wing media",
+    "the alt-right",
+    "fox news viewers",
+    "the koch brothers",
+    "climate change deniers",
+    "corporate interests",
+    "wall street republicans",
+    "war hawks",
+    "pro-life advocates",
+    "gun rights advocates",
+    "states' rights supporters",
+    "small government proponents",
+    "fiscal conservatives",
+    "free market enthusiasts",
+    "traditionalists",
+    "nationalists",
+    "anti-abortion activists",
+    "gun enthusiasts",
+    "big tent coalition",
+    "mainstream conservatives",
+    "moderates",
+    "conservative intellectuals",
+    "libertarians",
+    "never-Trumpers",
+    "centrists",
+    "conservative politicians",
+    "Republican lawmakers",
+    "right-wing candidates",
+    "GOP supporters",
+    "red state voters",
+    "conservative voters",
+    "conservative activists",
+    "Republican strategists",
+]
 
-# TBD
+# Create a Python list of at least 50 (lowercase, but including spaces) keywords
+# with all the ways Republicans call Democrats on Reddit. Use any terms which
+# can be used neutrally, pejoratively, or respectfully. Try to avoid false
+# positives like "blue".
+
+DEMOCRACT_KEYWORDS = [
+    "dems",
+    "liberals",
+    "left-wingers",
+    "democrats",
+    "progressives",
+    "blue team",
+    "the left",
+    "blue states",
+    "the democratic party",
+    "lefties",
+    "the liberal base",
+    "the establishment",
+    "the left-wing media",
+    "the radical left",
+    "the woke left",
+    "socialists",
+    "the squad",
+    "identity politics",
+    "big government advocates",
+    "tax-and-spend",
+    "bleeding heart liberals",
+    "snowflakes",
+    "the coastal elite",
+    "Hollywood liberals",
+    "latte liberals",
+    "limousine liberals",
+    "globalists",
+    "radical activists",
+    "the far left",
+    "the socialist agenda",
+    "the nanny state",
+    "tree huggers",
+    "job killers",
+    "cancel culture",
+    "political correctness",
+    "liberal media bias",
+    "tax raisers",
+    "handout seekers",
+    "social justice warriors",
+    "gun control advocates",
+    "open borders supporters",
+    "big tech sympathizers",
+    "wealth redistribution",
+    "identity politics",
+    "the deep state",
+    "liberal politicians",
+    "Democratic lawmakers",
+    "left-wing candidates",
+    "progressive activists",
+    "the blue wave",
+    "Democratic voters",
+    "liberal elites",
+    "leftist policies",
+    "left-leaning intellectuals",
+]

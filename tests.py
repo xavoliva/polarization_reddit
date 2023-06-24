@@ -19,7 +19,7 @@ from polarization.utils import (
 
 class Preprocessing(unittest.TestCase):
     def test_get_event_regex_and(self):
-        expected = r"\b(?:vot|elect)\b.*\b(?:presid hous|ballot)\b"
+        expected = r"\b(?:vot|elect)\b.*\b(?:presid hous|ballot)\b|\b(?:presid hous|ballot)\b.*\b(?:vot|elect)\b"
         actual = get_event_regex(
             ["voting", "elections"], ["president houses", "ballots"], "and"
         )
@@ -45,7 +45,7 @@ class Preprocessing(unittest.TestCase):
         self.assertEqual(False, actual[3])
 
     def test_tokenize_comment(self):
-        expected = "thi is a test com"
+        expected = "thi test com"
         actual = tokenize_comment(comment="This is a test comment.")
 
         self.assertEqual(expected, actual)
