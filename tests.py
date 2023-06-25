@@ -4,7 +4,7 @@ import scipy.sparse as sp
 import numpy as np
 import pandas as pd
 
-from preprocessing.constants import (
+from events.utils import (
     get_event_regex,
 )
 from preprocessing.utils import (
@@ -89,7 +89,7 @@ class Polarization(unittest.TestCase):
         c_0_D = [0, 1, 0, 3]
         c_1_D = [1, 1, 1, 3]
         c_2_D = [1, 2, 0, 2]
-        dem_user_term_matrix = sp.csr_matrix(
+        dem_user_term_matrix = sp.csr_matrix(  # type: ignore
             np.array(
                 [
                     c_0_D,
@@ -117,7 +117,7 @@ class Polarization(unittest.TestCase):
         c_0_R = [1, 0, 1, 2]
         c_1_R = [1, 0, 0, 3]
 
-        rep_user_term_matrix = sp.csr_matrix(
+        rep_user_term_matrix = sp.csr_matrix(  # type: ignore
             [
                 c_0_R,
                 c_1_R,

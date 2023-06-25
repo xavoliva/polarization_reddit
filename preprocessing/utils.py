@@ -10,9 +10,9 @@ from nltk.corpus import stopwords
 import pandas as pd
 import numpy as np
 import polars as pl
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix  # type: ignore
 from sklearn.feature_extraction.text import CountVectorizer
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 from preprocessing.constants import (
     EVENTS_DIR,
