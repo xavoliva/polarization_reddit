@@ -5,10 +5,8 @@ from tqdm import tqdm
 
 tqdm.pandas()
 
-from eda.constants import FIGURES_DIR, FIG_SIZE
-from preprocessing.utils import get_sentiment_score
-
-sns.set(rc={"figure.figsize": FIG_SIZE})
+from eda.constants import FIGURES_DIR, PARTIES_COLORS
+from affection.utils import get_sentiment_score
 
 
 def barplot_top(comments: pd.DataFrame, column: str, year: int, n: int = 10):
@@ -67,6 +65,36 @@ def plot_daily_sentiment(comments: pd.DataFrame, year: int):
         bbox_inches="tight",
         pad_inches=0,
         format="pdf",
+    )
+
+    plt.show()
+
+
+def plot_event_comments_distribution(comments, theme, event_key):
+    plt.figure(figsize=(15, 6))
+
+    sns.histplot(
+        data=comments,
+        y="event_name",
+        weights="number_comments",
+        hue="party",
+        multiple="stack",
+        palette=PARTIES_COLORS,
+    )
+
+    plt.title(f"Number of comments per mass shooting and party")
+    plt.xlabel("Number of comments")
+    plt.ylabel("Event")
+
+    import os
+
+    if not os.path.exists(f"{FIGURES_DIR}/eda/{theme}/{event_key}"):
+        os.makedirs(f"{FIGURES_DIR}/eda/{theme}/{event_key}")
+
+    plt.legend(labels=["Republicans", "Democrats"])
+    plt.savefig(
+        f"{FIGURES_DIR}/eda/{theme}/{event_key}/number_comments_per_event_and_party.pdf",
+        bbox_inches="tight",
     )
 
     plt.show()
