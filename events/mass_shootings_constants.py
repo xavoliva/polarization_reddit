@@ -28,21 +28,6 @@ GUN_CONTROL_SUBREDDITS = [
 ]
 
 MASS_SHOOTINGS_EVENTS_INFO = {
-    "charleston_church_shooting": {
-        "name": "Charleston church shooting",
-        "date": pd.to_datetime("2015-06-17"),
-        "relevant_dates": {},
-        "regex": get_event_regex(
-            MASS_SHOOTINGS_KEYWORDS,
-            [
-                "charleston",
-            ],
-            "and",
-        ),
-        "keywords": [
-            "charleston",
-        ],
-    },
     "chattanooga_shooting": {
         "name": "Chattanooga shooting",
         "date": pd.to_datetime("2015-07-16"),
@@ -54,9 +39,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "chattanooga",
-        ],
     },
     "roseburg_shooting": {
         "name": "Roseburg shooting",
@@ -70,10 +52,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "umpqua",
-            "roseburg",
-        ],
     },
     "colorado_springs_shooting": {
         "name": "Colorado Springs shooting",
@@ -87,10 +65,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "colorado springs",
-            "planned parenthood",
-        ],
     },
     "san_bernardino_shooting": {
         "name": "San Bernardino shooting",
@@ -103,9 +77,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "san bernardino",
-        ],
     },
     "kalamazoo_shooting": {
         "name": "Kalamazoo shooting",
@@ -118,9 +89,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "kalamazoo",
-        ],
     },
     "orlando_nightclub_shooting": {
         "name": "Orlando nightclub shooting",
@@ -134,10 +102,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "orlando",
-            "pulse nightclub",
-        ],
     },
     "dallas_police_shooting": {
         "name": "Dallas police shooting",
@@ -150,9 +114,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "dallas",
-        ],
     },
     "baton_rouge_police_shooting": {
         "name": "Baton Rouge police shooting",
@@ -165,9 +126,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "baton rouge",
-        ],
     },
     "burlington_shooting": {
         "name": "Burlington shooting",
@@ -181,10 +139,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "burlington",
-            "cascade mall",
-        ],
     },
     "fort_lauderdale_airport_shooting": {
         "name": "Fort Lauderdale airport shooting",
@@ -197,9 +151,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "fort lauderdale",
-        ],
     },
     "fresno_shooting": {
         "name": "Fresno shooting",
@@ -212,9 +163,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "fresno",
-        ],
     },
     "san_francisco_cafe_shooting": {
         "name": "San Francisco cafe shooting",
@@ -228,10 +176,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            # "ups",
-            "san francisco",
-        ],
     },
     "vegas_shooting": {
         "name": "Las Vegas shooting",
@@ -247,12 +191,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "vegas",
-            "harvest festival",
-            "mandalay bay",
-            "route 91",
-        ],
     },
     "thornton_walmart_shooting": {
         "name": "Thornton Walmart shooting",
@@ -267,11 +205,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "thornton",
-            "walmart",
-            "denver",
-        ],
     },
     "sutherland_springs_church_shooting": {
         "name": "Sutherland Springs church shooting",
@@ -284,9 +217,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "sutherland springs",
-        ],
     },
     "parkland_school_shooting": {
         "name": "Parkland school shooting",
@@ -300,10 +230,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "parkland",
-            "marjory stoneman",
-        ],
     },
     "nashville_waffle_house_shooting": {
         "name": "Nashville Waffle House shooting",
@@ -317,10 +243,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "nashville",
-            "waffle house",
-        ],
     },
     "santa_fe_high_school_shooting": {
         "name": "Santa Fe High School shooting",
@@ -333,9 +255,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "santa fe",
-        ],
     },
     "annapolis_journal_shooting": {
         "name": "Annapolis Journal shooting",
@@ -349,10 +268,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "annapolis",
-            "capital gazette",
-        ],
     },
     "pittsburgh_synagogue_shooting": {
         "name": "Pittsburgh synagogue shooting",
@@ -366,10 +281,6 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "pittsburgh",
-            "tree of life",
-        ],
     },
     "thousand_oaks_bar_shooting": {
         "name": "Thousand Oaks bar shooting",
@@ -382,8 +293,5 @@ MASS_SHOOTINGS_EVENTS_INFO = {
             ],
             "and",
         ),
-        "keywords": [
-            "thousand oaks",
-        ],
     },
 }

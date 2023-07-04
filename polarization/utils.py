@@ -2,6 +2,7 @@
 Polarization utils
 """
 from typing import Dict, Tuple, List, Optional
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -154,9 +155,9 @@ def calculate_polarization(
 
         user_tokens = pd.concat([dem_user_tokens, rep_user_tokens])
 
-    user_term_matrix = build_term_matrix(user_tokens["tokens"], ngram_range, event_vocab)
-
-    user_cnt = user_term_matrix.shape[0]
+    user_term_matrix = build_term_matrix(
+        user_tokens["tokens"], ngram_range, event_vocab
+    )
 
     # filter out words used by fewer than 2 people
     word_ind = [
@@ -168,6 +169,28 @@ def calculate_polarization(
     ]
 
     user_term_matrix: sp.csr_matrix = user_term_matrix[:, word_ind]  # type: ignore
+
+    nr_users_before = user_term_matrix.shape[0]
+
+    user_ind = [
+        ind
+        for ind, is_more_than_zero in enumerate(
+            user_term_matrix.getnnz(axis=1) > 0  # type: ignore
+        )
+        if is_more_than_zero
+    ]
+
+    # filter out users without any word in vocabulary
+    user_term_matrix: sp.csr_matrix = user_term_matrix[user_ind]
+
+    user_cnt = user_term_matrix.shape[0]
+
+    if nr_users_before != user_cnt:
+        print(
+            f"Filtered out {nr_users_before - user_cnt} users without any word in vocabulary"
+        )
+
+        user_tokens = user_tokens.iloc[user_ind]
 
     dem_indices = [
         ind
@@ -197,7 +220,11 @@ def calculate_polarization(
 
         print("Calculate leave-out polarization with random assignment of users")
 
-        random_users_dem, random_users_rep = random_shuffle_users(user_term_matrix)
+        random_users_dem, random_users_rep = random_shuffle_users(
+            user_term_matrix,
+            dem_cnt=dem_user_term_matrix.shape[0],
+            rep_cnt=rep_user_term_matrix.shape[0],
+        )
 
         random_polarization, _, _ = calculate_leaveout_polarization(
             random_users_dem,
@@ -245,18 +272,20 @@ def get_balanced_partisan_user_tokens(
         return dem_user_tokens, rep_user_tokens
 
 
-def random_shuffle_users(user_term_matrix: sp.csr_matrix):
+def random_shuffle_users(user_term_matrix: sp.csr_matrix, dem_cnt, rep_cnt):
     RNG = np.random.default_rng(SEED)
 
     user_cnt: int = user_term_matrix.shape[0]
 
+    assert dem_cnt + rep_cnt == user_cnt
+
     shuffled_user_ind = RNG.choice(user_cnt, replace=False, size=user_cnt)
 
     random_users_dem: sp.csr_matrix = user_term_matrix[
-        shuffled_user_ind[: int(user_cnt / 2)]
+        shuffled_user_ind[:dem_cnt]
     ]  # type: ignore
     random_users_rep: sp.csr_matrix = user_term_matrix[
-        shuffled_user_ind[int(user_cnt / 2) :]
+        shuffled_user_ind[dem_cnt :]
     ]  # type: ignore
 
     return random_users_dem, random_users_rep
@@ -269,12 +298,15 @@ def calculate_polarization_by_time(
     freq="D",
     equalize_users: bool = True,
 ):
-    polarization = []
+    polarization = defaultdict(list)
     for datetime, date_comments in event_comments.groupby(
         pd.Grouper(key="datetime", freq=freq)
     ):
         print(datetime)
-        (total_polarization, random_polarization, user_cnt), _ = calculate_polarization(
+        (total_polarization, random_polarization, user_cnt), (
+            dem_pol,
+            rep_pol,
+        ) = calculate_polarization(
             comments=date_comments,
             ngram_range=ngram_range,
             event_vocab=event_vocab,
@@ -282,31 +314,22 @@ def calculate_polarization_by_time(
             equalize_users=equalize_users,
         )
         print(total_polarization)
-        polarization.append(
-            (
-                total_polarization,
-                random_polarization,
-                user_cnt,
-                datetime,
-            )
-        )
 
-    polarization_time = pd.DataFrame(
-        polarization,
-        columns=[
-            "polarization",
-            "random_polarization",
-            "user_cnt",
-            "date",
-        ],
-    )
+        polarization["polarization"].append(total_polarization)
+        polarization["random_polarization"].append(random_polarization)
+        polarization["user_cnt"].append(user_cnt)
+        polarization["date"].append(datetime)
+        polarization["dem_user_polarizations"].append(dem_pol)
+        polarization["rep_user_polarizations"].append(rep_pol)
 
-    polarization_time = polarization_time.astype(
+    polarization_time = pd.DataFrame.from_dict(polarization).astype(
         {
             "polarization": "float",
             "random_polarization": "float",
             "user_cnt": "int",
             "date": "string",
+            "dem_user_polarizations": "object",
+            "rep_user_polarizations": "object",
         }
     )
 

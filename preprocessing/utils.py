@@ -2,6 +2,7 @@
 Pre-processing utils
 """
 import json
+import os
 from typing import Dict, Tuple
 
 from nltk.stem.lancaster import LancasterStemmer
@@ -79,11 +80,13 @@ def tokenize_comment(
     return " ".join(tokens)
 
 
-def load_event_comments(event_name: str, engine: str = "pandas") -> pd.DataFrame:
+def load_event_comments(
+    theme: str, event_name: str, engine: str = "pandas"
+) -> pd.DataFrame:
     """
     Load dataframe from event
     """
-    comments_file = f"{EVENTS_DIR}/{event_name}_comments.parquet"
+    comments_file = f"{EVENTS_DIR}/{theme}/{event_name}_comments.parquet"
 
     if engine == "pandas":
         event_comments = pd.read_parquet(
@@ -101,13 +104,19 @@ def load_event_comments(event_name: str, engine: str = "pandas") -> pd.DataFrame
     return event_comments
 
 
-def save_event_comments(event_comments: pd.DataFrame, event_name: str):
+def save_event_comments(theme: str, event_comments: pd.DataFrame, event_name: str):
     """
     Save event dataframe
     """
 
+    folder_name = f"{EVENTS_DIR}/{theme}"
+
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+
+
     event_comments.to_parquet(
-        f"{EVENTS_DIR}/{event_name}_comments.parquet",
+        f"{folder_name}/{event_name}_comments.parquet",
         engine="pyarrow",
         compression="snappy",
         index=False,
@@ -119,16 +128,11 @@ def save_event_vocab(event_vocab: Dict[str, int], event_name: str):
         json.dump(event_vocab, file)
 
 
-def load_event_vocab(event_name: str):
-    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "r", encoding="utf-8") as file:
+def load_event_vocab(theme: str, event_name: str):
+    with open(
+        f"{EVENTS_DIR}/{theme}/{event_name}_tokens.json", "r", encoding="utf-8"
+    ) as file:
         return json.load(file)
-
-
-def get_sentiment_score(comment: str) -> float:
-    # Create a SentimentIntensityAnalyzer object
-    sia = SentimentIntensityAnalyzer()
-
-    return sia.polarity_scores(comment)["compound"]
 
 
 def calculate_user_party(partisan_comments: pd.DataFrame) -> pd.Series:
