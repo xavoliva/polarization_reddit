@@ -226,17 +226,28 @@ def save_df_as_json(data: pd.DataFrame, target_file: str):
     )
 
 
-def save_df_as_parquet(data: pd.DataFrame, target_file: str):
+def save_df_as_parquet(data: pd.DataFrame, target_file: str, date=None):
+
+    if date is not None:
+        folder = f"{OUTPUT_DIR}/{date}"
+    else:
+        folder = OUTPUT_DIR
+
     data.to_parquet(
-        f"{OUTPUT_DIR}/{target_file}",
+        f"{folder}/{target_file}",
         engine="pyarrow",
         compression="snappy",
         index=False,
     )
 
 
-def load_df_from_parquet(file_name: str) -> pd.DataFrame:
+def load_df_from_parquet(file_name: str, date=None) -> pd.DataFrame:
+    if date is not None:
+        folder = f"{OUTPUT_DIR}/{date}"
+    else:
+        folder = OUTPUT_DIR
+
     return pd.read_parquet(
-        f"{OUTPUT_DIR}/{file_name}",
+        f"{folder}/{file_name}",
         engine="pyarrow",
     )

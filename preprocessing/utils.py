@@ -104,7 +104,7 @@ def load_event_comments(
     return event_comments
 
 
-def save_event_comments(theme: str, event_comments: pd.DataFrame, event_name: str):
+def save_event_comments(event_comments: pd.DataFrame, theme: str, event_name: str):
     """
     Save event dataframe
     """
@@ -114,7 +114,6 @@ def save_event_comments(theme: str, event_comments: pd.DataFrame, event_name: st
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
 
-
     event_comments.to_parquet(
         f"{folder_name}/{event_name}_comments.parquet",
         engine="pyarrow",
@@ -123,14 +122,16 @@ def save_event_comments(theme: str, event_comments: pd.DataFrame, event_name: st
     )
 
 
-def save_event_vocab(event_vocab: Dict[str, int], event_name: str):
-    with open(f"{EVENTS_DIR}/{event_name}_tokens.json", "w", encoding="utf-8") as file:
+def save_event_vocab(event_vocab: Dict[str, int], theme: str, event_name: str):
+    with open(
+        f"{EVENTS_DIR}/{theme}/{event_name}_vocab.json", "w", encoding="utf-8"
+    ) as file:
         json.dump(event_vocab, file)
 
 
 def load_event_vocab(theme: str, event_name: str):
     with open(
-        f"{EVENTS_DIR}/{theme}/{event_name}_tokens.json", "r", encoding="utf-8"
+        f"{EVENTS_DIR}/{theme}/{event_name}_vocab.json", "r", encoding="utf-8"
     ) as file:
         return json.load(file)
 
