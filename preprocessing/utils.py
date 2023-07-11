@@ -71,7 +71,11 @@ def tokenize_comment(
 
     if filter_stopwords:
         stop_words = set(stopwords.words("english"))
-        tokens = [token for token in tokens if token not in stop_words]
+        tokens = [
+            token
+            for token in tokens
+            if token not in stop_words | {"nbsp", "url", "URL"}
+        ]
 
     # stem words
     if stemmer:
@@ -205,3 +209,7 @@ def build_term_vector(
 
 def build_term_vector_from_matrix(term_matrix: csr_matrix) -> np.ndarray:
     return term_matrix.sum(axis=0).A1  # type: ignore
+
+
+def normalize(x):
+    return x / np.linalg.norm(x, ord=2, axis=0, keepdims=True)
