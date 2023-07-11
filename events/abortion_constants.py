@@ -14,6 +14,8 @@ ABORTION_KEYWORDS = [
     "birth control",
     "planned parenthood",
     "roe vs wade",
+    "health v hellerstedt",
+    "heartbeat bill",
     "pro choice",
     "pro life",
     "anti choice",
@@ -23,6 +25,17 @@ ABORTION_KEYWORDS = [
 
 # TODO: ADD RELEVANT EVENT KEYWORDS
 ABORTION_EVENTS_INFO = {
+    "abortion": {
+        "name": "Abortion",
+        "relevant_dates": {
+            "Colorado Springs shooting": pd.to_datetime("2015-11-27"),
+            "Whole Woman's Health v. Hellerstedt": pd.to_datetime("2016-06-27"),
+            "Ohio heartbeat bill": pd.to_datetime("2019-11-04"),
+            "Georgia heartbeat bill": pd.to_datetime("2019-04-04"),
+        },
+        "regex": get_event_regex(ABORTION_KEYWORDS, [], "or"),
+
+    },
     "colorado_springs_shooting": {
         "name": "Colorado Springs shooting",
         "date": pd.to_datetime("2015-11-27"),
