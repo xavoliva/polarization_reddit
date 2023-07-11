@@ -106,7 +106,7 @@ def plot_event_comments_distribution(comments, theme, event_key):
 
 
 def plot_polarization_by_time(data, event_key, event_details, granularity):
-    plt.figure(figsize=(30, 6))
+    plt.figure(figsize=(15, 4))
 
     ax = sns.lineplot(
         data=data,
@@ -124,24 +124,48 @@ def plot_polarization_by_time(data, event_key, event_details, granularity):
         color="orange",
     )
 
+
+    trans = ax.get_xaxis_transform()
+
+    if "date" in event_details:
+        plt.axvline(
+            event_details["date"],
+            linestyle="--",
+            color="red",
+            # label=f"{event_details['name']}",  #  ({date_str})
+        )
+        plt.text(
+            event_details["date"],
+            0.1,
+            event_details['name'],
+            fontsize='x-small',
+            transform=trans,
+            rotation=-90,
+        )
+
+
     for relevant_event, relevant_event_date in event_details["relevant_dates"].items():
-        date_str = relevant_event_date.strftime("%Y-%m-%d")
+        # date_str = relevant_event_date.strftime("%Y-%m-%d")
         plt.axvline(
             relevant_event_date,
             linestyle="--",
             color="blue",
-            label=f"{relevant_event} ({date_str})",
+            # label=f"{relevant_event}", #  ({date_str})
         )
 
-    plt.axvline(
-        event_details["date"],
-        linestyle="--",
-        color="red",
-        label=f"{event_details['name']} ({date_str})",
-    )
+        plt.text(
+            relevant_event_date,
+            0.1,
+            relevant_event,
+            fontsize='x-small',
+            transform=trans,
+            rotation=-90,
+        )
 
     plt.xlabel("Date")
     plt.ylabel("Leave-out partisanship estimation")
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    sns.move_legend(ax, "center right")
     plt.legend()
 
     plt.savefig(
@@ -154,46 +178,37 @@ def plot_polarization_by_time(data, event_key, event_details, granularity):
 
 
 def plot_nr_users_by_time(
-    data, event_key, event_details, granularity,
+    data,
+    event_key,
+    event_details,
+    granularity,
 ):
     plt.figure(figsize=(30, 6))
 
-    if granularity == "month":
-        _ = sns.barplot(
-            x=data["date"],
-            y=data["user_cnt"],
-            hue=data["party"],
-        )
-    else:
-        _ = sns.lineplot(
-            x=data["date"],
-            y=data["user_cnt"],
-        )
-
-    color = iter(
-        cm.Greens(
-            np.linspace(0.4, 1, len(event_details["relevant_dates"]))
-        )
+    _ = sns.lineplot(
+        x=data["date"],
+        y=data["user_cnt"],
     )
 
-    for relevant_event, relevant_event_date in event_details[
-        "relevant_dates"
-    ].items():
-        relevant_event_date_str = relevant_event_date.strftime("%Y-%m-%d")
+    color = iter(cm.Greens(np.linspace(0.4, 1, len(event_details["relevant_dates"]))))
+
+    for relevant_event, relevant_event_date in event_details["relevant_dates"].items():
+        # relevant_event_date_str = relevant_event_date.strftime("%Y-%m-%d")
         plt.axvline(
             relevant_event_date,
             linestyle="--",
             color=next(color),
-            label=f"{relevant_event} ({relevant_event_date_str})",
+            label=f"{relevant_event}",  #  ({relevant_event_date_str})
         )
 
-    event_date_str = event_details["date"].strftime("%Y-%m-%d")
-    plt.axvline(
-        event_details["date"],
-        linestyle="--",
-        color="red",
-        label=f"{event_details['name']} ({event_date_str})",
-    )
+    if "date" in event_details:
+        # event_date_str = event_details["date"].strftime("%Y-%m-%d")
+        plt.axvline(
+            event_details["date"],
+            linestyle="--",
+            color="red",
+            label=f"{event_details['name']}",  # ({event_date_str})
+        )
 
     plt.xlabel("Date")
     plt.ylabel("Number of users")
@@ -206,4 +221,3 @@ def plot_nr_users_by_time(
         format="pdf",
     )
     plt.show()
-
