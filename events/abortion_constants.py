@@ -30,8 +30,8 @@ ABORTION_EVENTS_INFO = {
         "relevant_dates": {
             "Colorado Springs shooting": pd.to_datetime("2015-11-27"),
             "Whole Woman's Health v. Hellerstedt": pd.to_datetime("2016-06-27"),
-            "Ohio heartbeat bill": pd.to_datetime("2019-11-04"),
             "Georgia heartbeat bill": pd.to_datetime("2019-04-04"),
+            "Ohio heartbeat bill": pd.to_datetime("2019-04-11"),
         },
         "regex": get_event_regex(ABORTION_KEYWORDS, [], "or"),
 
@@ -66,7 +66,7 @@ ABORTION_EVENTS_INFO = {
     },
     "ohio_heartbeat_bill": {
         "name": "Ohio heartbeat bill",
-        "date": pd.to_datetime("2019-11-04"),
+        "date": pd.to_datetime("2019-04-11"),
         "relevant_dates": {},
         "regex": get_event_regex(
             ABORTION_KEYWORDS,

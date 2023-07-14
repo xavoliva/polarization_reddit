@@ -106,7 +106,7 @@ def plot_event_comments_distribution(comments, theme, event_key):
 
 
 def plot_polarization_by_time(data, event_key, event_details, granularity):
-    plt.figure(figsize=(15, 4))
+    plt.figure(figsize=(18, 6))
 
     ax = sns.lineplot(
         data=data,
@@ -138,7 +138,7 @@ def plot_polarization_by_time(data, event_key, event_details, granularity):
             event_details["date"],
             0.1,
             event_details['name'],
-            fontsize='x-small',
+            # fontsize='x-small',
             transform=trans,
             rotation=-90,
         )
@@ -157,7 +157,7 @@ def plot_polarization_by_time(data, event_key, event_details, granularity):
             relevant_event_date,
             0.1,
             relevant_event,
-            fontsize='x-small',
+            # fontsize='x-small',
             transform=trans,
             rotation=-90,
         )
